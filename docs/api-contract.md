@@ -84,7 +84,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 권한: 로그인
 - Query: `q` (제품 코드·중국어 제목·한국어 제목 부분 검색), `page`, `size`
 - 정렬: 최근 추가 순
-- Response 200: `{"status": "success", "items": [Product + "survey_count"], "total": 12, "page": 1, "size": 20}`
+- Response 200: `{"status": "success", "items": [Product + "survey_count" + "latest_survey" + "priced_platforms"], "total": 12, "page": 1, "size": 20}`
+  - `latest_survey`: 최근 가격 조사 요약 `{"id", "code", "survey_date", "option_count", "min_price_cny": "39.90"}` · 조사가 없으면 `null`
+  - `priced_platforms`: 판매가를 저장한 판매처 키 목록 (예: `["coupang", "naver"]`). 모든 판매처가 들어 있으면 "가격 책정 완료" (2026-10-20 추가)
 
 ### GET /products/{product_id} — 제품 상세
 - 권한: 로그인
