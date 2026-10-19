@@ -430,7 +430,25 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ```
 - `source`: `manual` (직접 입력) · `default` (기록이 없어 기본값 — DB 에 없는 값). 환율 API 를 붙이면 API 이름이 추가된다.
 
+### GET /shipping-fees/rule — 배송비 요금표 (무게 구간별)
+배송비 화면이 쓴다. 제품과 상관없이 요금 규칙 + 무게 구간별 위안 요금 + 현재 환율만 준다. 원화 환산은 FE 가 `fx` 로 한다 (환율을 바꾸면 원화도 바뀐다).
+- 권한: `research`
+- `brackets`: 첫 무게(1kg)부터 소형 한도(30kg)까지 0.5kg 단위. `max_volume_ml` = 이 구간에 들어가는 최대 용량 (`billable_kg` × 1000 − 박스 500g, 1ml = 1g)
+- Response 200
+  ```json
+  {
+    "status": "success",
+    "fx": FxRate,
+    "rule": {"service": "타오바오 집운-해운", "category": "식품", "first_kg": "1.0", "first_cny": "33.00", "step_kg": "0.5", "step_cny": "2.00", "max_kg": "30.0", "box_weight_g": 500},
+    "brackets": [
+      {"billable_kg": "1.0", "max_volume_ml": 500, "shipping_cny": "33.00"},
+      {"billable_kg": "1.5", "max_volume_ml": 1000, "shipping_cny": "35.00"}
+    ]
+  }
+  ```
+
 ### GET /shipping-fees — 배송비 (제품별 기준 조사 옵션)
+> 2026-10-20 부터 배송비 화면은 위 `/shipping-fees/rule` 을 쓴다. 이 API 는 남겨 두지만 FE 화면에서는 쓰지 않는다 (옵션별 배송비는 가격 책정 응답에 들어 있다).
 옵션 이름의 용량으로 무게를 잡고 집운 식품 요금표로 계산한 배송비. 원화 환산은 FE 가 `fx` 로 한다.
 - 권한: `research`
 - Query: `page`, `size` (공통)
