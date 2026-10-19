@@ -380,7 +380,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
     "fx_rate": "200", "fx_markup_pct": "0",
     "shipping_fee": 10000,
     "platform_fee_rate": "10.8", "payment_fee_rate": "0",
-    "option_prices": [{"option_id": 11, "sale_price": 19900}]
+    "option_prices": [{"option_id": 11, "sale_price": 19900, "listing_group": null, "is_base": false}]
   }
   ```
   | 필드 | 필수 | 규칙 |
@@ -392,7 +392,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `platform_fee_rate` | ✅ | 0~100, 소수 2자리 (%) |
   | `payment_fee_rate` | | 0~100, 소수 2자리. 기본 0 |
   | `option_prices` | ✅ | 그 조사의 옵션만, 같은 옵션 중복 불가 (아니면 400). `sale_price` 는 1 이상 정수 (원). 빠진 옵션은 판매가 없음으로 저장 |
-  | `base_option_id` | | 대표 옵션 (네이버 추가금 0원). `option_prices` 에 판매가가 있는 옵션이어야 함 (아니면 400). `null`(기본) = 자동 — FE 가 추가금 한도를 만족하는 가장 싼 옵션을 고른다 |
+  | `option_prices[].listing_group` | | (네이버) 이 옵션을 넣을 상품 번호 1~50 — 사람이 직접 옮긴 것만. `null`(기본) = 자동 (FE `naverListingPlan`: 한 상품에 다 들어가면 1개, 아니면 용량·입수별 → 가격으로 나눔) |
+  | `option_prices[].is_base` | | (네이버) 그 상품의 대표 옵션(추가금 0원)으로 직접 지정. 기본 `false` = 자동 (한도 안에 드는 가장 싼 옵션) |
+  | `base_option_id` | | **예전 방식 (2026-10-20 부터 안 씀 — 옵션별 `is_base`)** 대표 옵션 (네이버 추가금 0원). `option_prices` 에 판매가가 있는 옵션이어야 함 (아니면 400). `null`(기본) = 자동 — FE 가 추가금 한도를 만족하는 가장 싼 옵션을 고른다 |
 - `fx_date` 는 환율 API 연동 전까지 `null` 로 저장한다.
 - Response 200: `{"status": "success", "pricing": Pricing}`
 - Response 400 (조사·옵션이 안 맞음, 옵션 중복) · 404 (제품 없음, 알 수 없는 `platform`) · 409 (같은 판매처 첫 저장이 동시에 겹침 — 다시 시도)
@@ -404,7 +406,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   "platform": "coupang", "saved": true, "survey_id": 3,
   "fx_rate": "200.0000", "fx_date": null, "fx_markup_pct": "0.00",
   "shipping_fee": 10000, "platform_fee_rate": "10.80", "payment_fee_rate": "0.00",
-  "option_prices": [{"option_id": 11, "sale_price": 19900}],
+  "option_prices": [{"option_id": 11, "sale_price": 19900, "listing_group": null, "is_base": false}],
   "base_option_id": null,
   "updated_at": "2026-10-19T01:00:00+00:00"
 }
@@ -413,6 +415,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - `base_option_id` = 저장한 대표 옵션 (없으면 자동). 기준 조사가 바뀌었으면 판매가처럼 `null`.
   네이버 옵션가 한도 (할인 전 대표가 기준, 2026-10-20 확인): 1만 원 이상 −50%~+50% · 2천~1만 원 −50%~+100% · 2천 원 미만 0~+100%. FE `NAVER_ADDON_LIMITS`.
 - `option_prices` 는 응답의 `options` 순서·개수와 같다 (판매가 없으면 `sale_price: null`).
+- `option_prices[].listing_group` · `is_base` = 저장한 직접 지정값 (없으면 `null` · `false`). 네이버 상품 나눠 등록 — 기준 조사가 바뀌었으면 빈 값.
 - 저장된 설정의 `survey_id` 가 기준 조사와 다르면(새 조사가 생김) 판매가는 옛 옵션 기준이라 전부 `null` 로 주고, `survey_id` 는 저장된 값 그대로 준다 → FE 는 "새 조사 기준으로 다시 저장" 안내.
 - **차익 · 마진율은 BE 가 주지 않는다** — FE 가 계산한다 (BE `DESIGN.md` §6.3 공식).
 
