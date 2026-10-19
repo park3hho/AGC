@@ -1,0 +1,639 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AGC UI 개편 목업</title>
+<style>
+  :root {
+    --color-primary: #3182f6; --color-primary-pressed: #1b64da; --color-primary-bg: #e8f3ff;
+    --color-danger: #f04452; --color-success: #0a7a3e; --color-success-bg: #e5f8ee;
+    --color-warning: #a35c00; --color-warning-bg: #fff3e0;
+    --color-text: #191f28; --color-text-sub: #4e5968; --color-text-weak: #8b95a1;
+    --color-border: #e5e8eb; --color-bg: #ffffff; --color-bg-sub: #f2f4f6; --color-bg-app: #f7f8fa;
+    --font-sm: 14px; --font-md: 16px; --font-lg: 20px; --font-xl: 26px;
+    --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px;
+    --radius: 12px; --sidebar: 232px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+    color: var(--color-text); background: #dfe3e8; font-size: 15px;
+  }
+  button { font: inherit; cursor: pointer; }
+  img { display: block; }
+
+  /* ---------- 목업 바깥 툴바 (실제 앱 아님) ---------- */
+  .mock-bar {
+    position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: var(--space-3);
+    padding: 10px 20px; background: #191f28; color: #fff; font-size: 13px;
+  }
+  .mock-bar b { font-size: 14px; }
+  .mock-bar .sp { flex: 1; }
+  .seg { display: inline-flex; background: #333d4b; border-radius: 8px; padding: 3px; }
+  .seg button { border: 0; background: none; color: #b0b8c1; padding: 5px 12px; border-radius: 6px; font-size: 13px; }
+  .seg button.on { background: #fff; color: #191f28; font-weight: 600; }
+
+  /* ---------- 데스크탑 앱 셸 ---------- */
+  .stage { padding: 24px; }
+  .app {
+    display: grid; grid-template-columns: var(--sidebar) 1fr; height: 860px; max-width: 1440px; margin: 0 auto;
+    background: var(--color-bg-app); border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.12);
+  }
+  .side { display: flex; flex-direction: column; background: var(--color-bg); border-right: 1px solid var(--color-border); padding: var(--space-4) var(--space-3); }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 18px; }
+  .brand .logo { width: 32px; height: 32px; border-radius: 9px; background: var(--color-primary); color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+  .brand b { font-size: 16px; display: block; }
+  .brand small { color: var(--color-text-weak); font-size: 12px; }
+  .nav-group { margin-top: var(--space-3); }
+  .nav-label { padding: 0 10px 6px; color: var(--color-text-weak); font-size: 12px; font-weight: 600; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; height: 40px; padding: 0 10px; border: 0; border-radius: 9px;
+    background: none; color: var(--color-text-sub); text-align: left; font-size: 15px;
+  }
+  .nav-item:hover { background: var(--color-bg-sub); }
+  .nav-item.on { background: var(--color-primary-bg); color: var(--color-primary-pressed); font-weight: 600; }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item .cnt { margin-left: auto; min-width: 22px; padding: 1px 7px; border-radius: 10px; background: var(--color-warning-bg); color: var(--color-warning); font-size: 12px; font-weight: 700; text-align: center; }
+  .nav-item.soon { color: var(--color-text-weak); }
+  .nav-item.soon::after { content: '준비 중'; margin-left: auto; font-size: 11px; color: var(--color-text-weak); }
+  .side .sp { flex: 1; }
+  .me { display: flex; align-items: center; gap: 10px; padding: 10px; border-top: 1px solid var(--color-border); }
+  .me .av { width: 32px; height: 32px; border-radius: 50%; background: var(--color-bg-sub); display: grid; place-items: center; font-weight: 700; font-size: 13px; color: var(--color-text-sub); }
+  .me b { display: block; font-size: 14px; }
+  .me small { color: var(--color-text-weak); font-size: 12px; }
+  .me button { margin-left: auto; border: 0; background: none; color: var(--color-text-sub); font-size: 13px; }
+
+  .main { display: flex; flex-direction: column; min-width: 0; overflow: auto; }
+  .topbar {
+    position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: var(--space-3);
+    height: 56px; padding: 0 var(--space-6); background: rgba(247,248,250,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--color-border);
+  }
+  .crumb { color: var(--color-text-weak); font-size: 14px; }
+  .crumb b { color: var(--color-text); font-weight: 600; }
+  .topbar .sp { flex: 1; }
+  .gsearch { display: flex; align-items: center; gap: 8px; width: 300px; height: 36px; padding: 0 12px; border-radius: 9px; background: var(--color-bg); border: 1px solid var(--color-border); color: var(--color-text-weak); font-size: 14px; }
+  .fxchip { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 9px; background: var(--color-bg); border: 1px solid var(--color-border); font-size: 13px; color: var(--color-text-sub); }
+  .fxchip b { color: var(--color-text); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: #f59f00; }
+
+  .content { padding: var(--space-5) var(--space-6) var(--space-6); max-width: 1180px; width: 100%; }
+  .page-head { display: flex; align-items: flex-end; gap: var(--space-3); margin-bottom: var(--space-5); }
+  .page-head h1 { margin: 0; font-size: var(--font-xl); }
+  .page-head p { margin: 6px 0 0; color: var(--color-text-sub); font-size: 14px; }
+  .page-head .sp { flex: 1; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 40px; padding: 0 16px; border-radius: 10px; border: 0; font-weight: 600; font-size: 14px; white-space: nowrap; }
+  .btn-primary { background: var(--color-primary); color: #fff; }
+  .btn-secondary { background: var(--color-bg-sub); color: var(--color-text); }
+  .btn-ghost { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); }
+  .btn-sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 8px; }
+
+  .panel { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius); }
+  .panel-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); font-weight: 700; }
+  .panel-head .sp { flex: 1; }
+  .panel-head a, .link { color: var(--color-primary); font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .panel-body { padding: var(--space-4) var(--space-5); }
+
+  .code { display: inline-block; padding: 2px 7px; border-radius: 6px; background: var(--color-primary-bg); color: var(--color-primary-pressed); font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .b-done { background: var(--color-success-bg); color: var(--color-success); }
+  .b-wait { background: var(--color-warning-bg); color: var(--color-warning); }
+  .b-none { background: var(--color-bg-sub); color: var(--color-text-sub); }
+  .thumb { width: 44px; height: 44px; border-radius: 9px; object-fit: cover; background: var(--color-bg-sub); flex-shrink: 0; }
+  .sub { color: var(--color-text-sub); font-size: 13px; }
+  .weak { color: var(--color-text-weak); font-size: 13px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .pos { color: var(--color-success); }
+
+  /* ---------- 홈 ---------- */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); margin-bottom: var(--space-4); }
+  .kpi { padding: var(--space-4) var(--space-5); }
+  .kpi .lb { color: var(--color-text-sub); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+  .kpi .v { margin-top: 8px; font-size: 26px; font-weight: 800; }
+  .kpi .v small { font-size: 14px; font-weight: 600; color: var(--color-text-sub); margin-left: 2px; }
+  .kpi .meta { margin-top: 4px; font-size: 12px; color: var(--color-text-weak); }
+  .bar { height: 6px; border-radius: 3px; background: var(--color-bg-sub); margin-top: 10px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--color-success); border-radius: 3px; }
+
+  .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; margin-bottom: var(--space-4); }
+  .step { position: relative; padding: var(--space-4) var(--space-5); cursor: pointer; }
+  .step + .step { border-left: 1px solid var(--color-border); }
+  .step .n { font-size: 12px; color: var(--color-text-weak); font-weight: 600; }
+  .step .t { margin-top: 4px; font-weight: 700; }
+  .step .c { margin-top: 8px; font-size: 13px; color: var(--color-text-sub); }
+  .step .c b { color: var(--color-text); font-size: 18px; margin-right: 2px; }
+  .step.hot .c b { color: var(--color-warning); }
+  .step.off { opacity: .45; cursor: default; }
+  .step:not(.off):hover { background: var(--color-bg-app); }
+
+  .home-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-4); }
+  .row { display: flex; align-items: center; gap: var(--space-3); padding: 10px var(--space-5); border-bottom: 1px solid var(--color-border); cursor: pointer; }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--color-bg-app); }
+  .row .grow { flex: 1; min-width: 0; }
+  .row .ttl { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .todo { display: flex; align-items: center; gap: var(--space-3); padding: 14px var(--space-5); border-bottom: 1px solid var(--color-border); }
+  .todo:last-child { border-bottom: 0; }
+  .todo .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+  .todo .ic svg { width: 18px; height: 18px; }
+  .todo .grow { flex: 1; }
+  .todo .grow b { display: block; font-size: 14px; }
+
+  /* ---------- 목록 (테이블) ---------- */
+  .toolbar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--color-border); }
+  .input { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-bg); color: var(--color-text-weak); font-size: 14px; }
+  .select { height: 36px; padding: 0 30px 0 12px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b95a1' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; font-size: 14px; color: var(--color-text); appearance: none; }
+  .toolbar .sp { flex: 1; }
+  table.tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .tbl th { padding: 10px var(--space-4); text-align: left; color: var(--color-text-weak); font-size: 12px; font-weight: 600; background: var(--color-bg-app); border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+  .tbl td { padding: 10px var(--space-4); border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: 0; }
+  .tbl tbody tr { cursor: pointer; }
+  .tbl tbody tr:hover td { background: var(--color-bg-app); }
+  .tbl .r { text-align: right; }
+  .pcell { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+  .pcell .ttl { font-weight: 600; }
+  .pager { display: flex; align-items: center; justify-content: space-between; padding: var(--space-3) var(--space-4); border-top: 1px solid var(--color-border); font-size: 13px; color: var(--color-text-sub); }
+
+  /* ---------- 상세 ---------- */
+  .detail { display: grid; grid-template-columns: 400px 1fr; gap: var(--space-5); align-items: start; }
+  .hero { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius); background: var(--color-bg-sub); }
+  .thumbs { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-2); margin-top: var(--space-2); }
+  .thumbs figure { margin: 0; cursor: pointer; }
+  .thumbs img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; border: 2px solid transparent; background: var(--color-bg-sub); }
+  .thumbs figure.on img { border-color: var(--color-primary); }
+  .thumbs figcaption { margin-top: 3px; font-size: 11px; color: var(--color-text-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .thumbs .empty { width: 100%; aspect-ratio: 1; border-radius: 8px; border: 1px dashed var(--color-border); display: grid; place-items: center; color: var(--color-text-weak); font-size: 11px; }
+  .dl { display: grid; grid-template-columns: 120px 1fr; row-gap: 12px; margin: 0; font-size: 14px; }
+  .dl dt { color: var(--color-text-sub); }
+  .dl dd { margin: 0; }
+  .title-xl { font-size: 22px; font-weight: 800; margin: 6px 0 2px; }
+  .actions { display: flex; gap: var(--space-2); margin-top: var(--space-5); }
+  .tabs { display: flex; gap: var(--space-5); padding: 0 var(--space-5); border-bottom: 1px solid var(--color-border); }
+  .tabs span { padding: 14px 0; font-weight: 600; color: var(--color-text-weak); border-bottom: 2px solid transparent; cursor: pointer; }
+  .tabs span.on { color: var(--color-text); border-bottom-color: var(--color-text); }
+  .price-mini { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-4); }
+  .price-mini .panel { padding: var(--space-3) var(--space-4); }
+  .price-mini .t { font-size: 13px; color: var(--color-text-sub); }
+  .price-mini .v { font-size: 18px; font-weight: 800; margin-top: 2px; }
+
+  /* ---------- 가격 책정 ---------- */
+  .pr-head { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+  .pr-head .grow { flex: 1; }
+  .bulk { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-5); background: var(--color-bg-app); border-top: 1px solid var(--color-border); border-bottom: 1px solid var(--color-border); }
+  .pill { display: inline-flex; background: var(--color-bg-sub); border-radius: 9px; padding: 3px; }
+  .pill span { padding: 6px 12px; border-radius: 7px; font-size: 13px; color: var(--color-text-sub); }
+  .pill span.on { background: #fff; color: var(--color-text); font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .ninput { width: 110px; height: 36px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 9px; background: #fff; text-align: right; font-weight: 600; display: flex; align-items: center; justify-content: flex-end; }
+  .ptable { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .ptable th { padding: 12px var(--space-5); text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-border); font-weight: 600; }
+  .ptable td { padding: 12px var(--space-5); border-bottom: 1px solid var(--color-border); vertical-align: top; }
+  .ptable .plat { font-size: 15px; font-weight: 800; }
+  .ptable .fees { margin-top: 6px; font-size: 12px; color: var(--color-text-sub); font-weight: 400; }
+  .ptable .ninput { width: 140px; }
+  .mbar { height: 4px; width: 140px; background: var(--color-bg-sub); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+  .mbar i { display: block; height: 100%; background: var(--color-primary); }
+  .tag { display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 5px; background: var(--color-primary-bg); color: var(--color-primary-pressed); font-size: 11px; font-weight: 700; vertical-align: middle; }
+  .savebar { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-5); }
+  .savebar .sp { flex: 1; }
+
+  /* ---------- 주석 (목업 설명) ---------- */
+  .note { position: relative; margin: 0 auto var(--space-4); max-width: 1440px; padding: 12px 16px; border-radius: 10px; background: #fffbe6; border: 1px solid #ffe58f; font-size: 13px; color: #5c4400; line-height: 1.6; }
+  .note b { color: #3d2d00; }
+  .note ol { margin: 4px 0 0; padding-left: 18px; }
+
+  /* ---------- 모바일 ---------- */
+  .phones { display: flex; justify-content: center; gap: 40px; flex-wrap: wrap; }
+  .phone { width: 390px; height: 800px; border-radius: 44px; background: #111; padding: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+  .phone-in { position: relative; height: 100%; border-radius: 34px; overflow: hidden; background: var(--color-bg-app); display: flex; flex-direction: column; }
+  .p-status { height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 26px; font-size: 14px; font-weight: 600; background: var(--color-bg); }
+  .p-top { display: flex; align-items: center; gap: 10px; padding: 8px 18px 12px; background: var(--color-bg); }
+  .p-top h2 { margin: 0; font-size: 22px; }
+  .p-top .sp { flex: 1; }
+  .p-body { flex: 1; overflow: auto; padding: 14px 16px 90px; }
+  .p-tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; padding-bottom: 18px; display: grid; grid-template-columns: repeat(5, 1fr); background: var(--color-bg); border-top: 1px solid var(--color-border); }
+  .p-tabs span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: 11px; color: var(--color-text-weak); }
+  .p-tabs span.on { color: var(--color-primary); font-weight: 700; }
+  .p-tabs svg { width: 22px; height: 22px; }
+  .p-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .p-kpis .panel { padding: 12px 14px; }
+  .p-kpis .v { font-size: 22px; font-weight: 800; margin-top: 4px; }
+  .p-sec { margin: 18px 2px 8px; font-weight: 700; font-size: 15px; display: flex; }
+  .p-sec .sp { flex: 1; }
+  .p-list .row { padding: 10px 14px; }
+  .fab { position: absolute; right: 18px; bottom: 96px; width: 54px; height: 54px; border-radius: 50%; background: var(--color-primary); color: #fff; display: grid; place-items: center; box-shadow: 0 6px 16px rgba(49,130,246,.4); }
+  .fab svg { width: 24px; height: 24px; }
+  .chips { display: flex; gap: 8px; margin-bottom: 12px; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="mock-bar">
+  <b>AGC UI 개편 목업</b>
+  <span style="color:#8b95a1">실제 데이터 기반 · 클릭해서 화면 이동 가능</span>
+  <span class="sp"></span>
+  <div class="seg" id="deviceSeg">
+    <button class="on" data-device="desktop">데스크탑</button>
+    <button data-device="mobile">모바일</button>
+  </div>
+</div>
+
+<div class="stage">
+
+  <!-- ===================== 데스크탑 ===================== -->
+  <div id="desktop">
+    <div class="note" id="note"></div>
+
+    <div class="app">
+      <!-- 사이드바: 업무 흐름 순서대로 묶음 -->
+      <aside class="side">
+        <div class="brand">
+          <div class="logo">AGC</div>
+          <div><b>AGC 구매대행</b><small>타오바오 → 네이버·쿠팡</small></div>
+        </div>
+
+        <button class="nav-item on" data-go="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>홈</button>
+
+        <div class="nav-group">
+          <div class="nav-label">소싱</div>
+          <button class="nav-item" data-go="products"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/></svg>제품조사</button>
+          <button class="nav-item" data-go="surveys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 4 6 8 6-8M12 12v8M8 12h8M8 16h8"/></svg>가격조사</button>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">판매</div>
+          <button class="nav-item" data-go="pricing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>가격 책정<span class="cnt">12</span></button>
+          <button class="nav-item soon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4zM4 9h16M9 9v11"/></svg>상품 등록</button>
+          <button class="nav-item soon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0"/></svg>주문</button>
+        </div>
+        <div class="nav-group">
+          <div class="nav-label">설정</div>
+          <button class="nav-item" data-go="shipping"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>배송비</button>
+          <button class="nav-item" data-go="fx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg>환율</button>
+          <button class="nav-item" data-go="accounts"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></svg>회사 계정</button>
+          <button class="nav-item" data-go="users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>사용자 관리</button>
+        </div>
+
+        <div class="sp"></div>
+        <div class="me">
+          <div class="av">관</div>
+          <div><b>관리자</b><small>관리자</small></div>
+          <button>로그아웃</button>
+        </div>
+      </aside>
+
+      <section class="main">
+        <!-- 상단바: 위치 · 전체 검색 · 현재 환율 (모든 화면 공통) -->
+        <div class="topbar">
+          <div class="crumb" id="crumb"><b>홈</b></div>
+          <div class="sp"></div>
+          <div class="gsearch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>제품명·코드 검색 (중국어 가능)</div>
+          <div class="fxchip"><span class="dot"></span>1위안 = <b>200원</b> · 기본값</div>
+        </div>
+
+        <div class="content">
+
+          <!-- ============ 홈 ============ -->
+          <div data-screen="home">
+            <div class="page-head">
+              <div><h1>안녕하세요, 관리자님</h1><p>오늘 할 일과 진행 현황이에요</p></div>
+              <div class="sp"></div>
+              <button class="btn btn-ghost">가격조사 추가</button>
+              <button class="btn btn-primary" data-go="products">+ 제품 추가</button>
+            </div>
+
+            <div class="kpis">
+              <div class="panel kpi"><div class="lb">조사한 제품</div><div class="v num">20<small>개</small></div><div class="meta">오늘 +12 · 어제 +8</div></div>
+              <div class="panel kpi"><div class="lb">가격조사</div><div class="v num">20<small>건</small></div><div class="meta">옵션 합계 72종류</div></div>
+              <div class="panel kpi"><div class="lb">가격 책정 완료</div><div class="v num">8<small>/ 20</small></div><div class="bar"><i style="width:40%"></i></div></div>
+              <div class="panel kpi"><div class="lb">현재 환율</div><div class="v num">200<small>원/위안</small></div><div class="meta" style="color:var(--color-warning)">기본값 사용 중 · 아직 저장 안 함</div></div>
+            </div>
+
+            <!-- 업무 흐름: 단계별 건수, 누르면 해당 목록으로 -->
+            <div class="panel flow">
+              <div class="step" data-go="products"><div class="n">1단계</div><div class="t">제품조사</div><div class="c"><b>20</b>개 등록</div></div>
+              <div class="step" data-go="surveys"><div class="n">2단계</div><div class="t">가격조사</div><div class="c"><b>20</b>건 · 조사 없는 제품 0</div></div>
+              <div class="step hot" data-go="pricing"><div class="n">3단계</div><div class="t">가격 책정</div><div class="c"><b>12</b>개 대기</div></div>
+              <div class="step off"><div class="n">4단계</div><div class="t">상품 등록</div><div class="c">준비 중</div></div>
+              <div class="step off"><div class="n">5단계</div><div class="t">주문 처리</div><div class="c">준비 중</div></div>
+            </div>
+
+            <div class="home-grid">
+              <div class="panel">
+                <div class="panel-head">최근 추가한 제품<span class="sp"></span><a data-go="products">전체 보기</a></div>
+                <div id="recentList"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-head">할 일</div>
+                <div class="todo">
+                  <div class="ic" style="background:var(--color-warning-bg);color:var(--color-warning)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/></svg></div>
+                  <div class="grow"><b>판매가를 아직 안 정한 제품 12개</b><span class="sub">조사는 끝났어요. 목표 차익으로 한 번에 맞출 수 있어요</span></div>
+                  <button class="btn btn-secondary btn-sm" data-go="pricing">정하기</button>
+                </div>
+                <div class="todo">
+                  <div class="ic" style="background:var(--color-primary-bg);color:var(--color-primary)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 7h13l-4-4M17 17H4l4 4"/></svg></div>
+                  <div class="grow"><b>환율이 기본값(200원)이에요</b><span class="sub">오늘 환율을 저장하면 원가·차익이 다시 계산돼요</span></div>
+                  <button class="btn btn-secondary btn-sm">저장</button>
+                </div>
+                <div class="todo">
+                  <div class="ic" style="background:var(--color-bg-sub);color:var(--color-text-sub)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></div>
+                  <div class="grow"><b>맛별 사진이 빠진 옵션 20개</b><span class="sub">등록 전에 채우면 상세페이지 만들기 쉬워요</span></div>
+                  <button class="btn btn-secondary btn-sm" data-go="products">보기</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============ 제품조사 목록 ============ -->
+          <div data-screen="products" hidden>
+            <div class="page-head">
+              <div><h1>제품조사</h1><p>타오바오에서 찾은 제품 20개</p></div>
+              <div class="sp"></div>
+              <button class="btn btn-primary">+ 제품 추가</button>
+            </div>
+            <div class="panel">
+              <div class="toolbar">
+                <div class="input" style="width:280px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>이름·코드 검색</div>
+                <select class="select"><option>가격 책정: 전체</option><option>완료</option><option>대기</option></select>
+                <select class="select"><option>추가일: 최근 순</option><option>최저가 낮은 순</option></select>
+                <span class="sp"></span>
+                <span class="weak">20개 중 1–10</span>
+              </div>
+              <table class="tbl">
+                <thead><tr><th>제품</th><th>코드</th><th class="r">옵션</th><th class="r">타오바오 최저가</th><th>가격 책정</th><th>추가일</th></tr></thead>
+                <tbody id="productRows"></tbody>
+              </table>
+              <div class="pager"><span>한 화면 10개</span><span><button class="btn btn-ghost btn-sm">이전</button> <b style="margin:0 8px">1 / 2</b> <button class="btn btn-ghost btn-sm">다음</button></span></div>
+            </div>
+          </div>
+
+          <!-- ============ 제품 상세 ============ -->
+          <div data-screen="detail" hidden>
+            <div class="detail">
+              <div>
+                <img class="hero" id="hero" src="" alt="" />
+                <div class="thumbs" id="thumbs"></div>
+              </div>
+              <div>
+                <span class="code">PR-261020-000C</span> <span class="badge b-done">가격 책정 완료</span>
+                <div class="title-xl">둥펑 과일차 (저당)</div>
+                <div class="sub">东鹏 果之茶 低糖果味茶饮料</div>
+
+                <div class="panel" style="margin-top:var(--space-4)">
+                  <div class="panel-body">
+                    <dl class="dl">
+                      <dt>제조사</dt><dd>东鹏 (둥펑)</dd>
+                      <dt>타오바오</dt><dd><span class="link">공식 판매몰 열기 ↗</span></dd>
+                      <dt>옵션</dt><dd>3종류 · 500ml×24병</dd>
+                      <dt>타오바오 가격</dt><dd class="num">¥59.90 (원가+배송 27,780원)</dd>
+                      <dt>추가일</dt><dd>2026-10-20</dd>
+                    </dl>
+                  </div>
+                </div>
+
+                <div class="price-mini">
+                  <div class="panel"><div class="t">쿠팡 판매가</div><div class="v num">34,900원</div><div class="sub">차익 <b class="pos">3,051원</b> · 8.7%</div></div>
+                  <div class="panel"><div class="t">네이버 대표가</div><div class="v num">33,000원</div><div class="sub">차익 <b class="pos">3,032원</b> · 9.2%</div></div>
+                </div>
+
+                <div class="actions">
+                  <button class="btn btn-primary" data-go="pricing">가격 책정 열기</button>
+                  <button class="btn btn-ghost">가격조사 추가</button>
+                  <button class="btn btn-ghost">수정</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel" style="margin-top:var(--space-5)">
+              <div class="tabs"><span class="on">옵션 3</span><span>가격조사 1</span><span>판매처 등록 (준비 중)</span></div>
+              <table class="tbl">
+                <thead><tr><th>옵션</th><th>용량·입수</th><th class="r">타오바오</th><th class="r">쿠팡</th><th class="r">네이버</th></tr></thead>
+                <tbody id="optRows"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- ============ 가격 책정 ============ -->
+          <div data-screen="pricing" hidden>
+            <div class="page-head">
+              <div><h1>가격 책정</h1><p>쿠팡·네이버 판매가를 옵션별로 정해요</p></div>
+              <div class="sp"></div>
+              <select class="select"><option>대기 12개만</option><option>전체 20개</option></select>
+            </div>
+
+            <div class="panel">
+              <div class="pr-head">
+                <img class="thumb" src="https://agc-fe.vercel.app/api/files/photos/2026/10/5178ac2c7ac54f1993f480d61ada6615.jpg" alt="" />
+                <div class="grow">
+                  <div><b>둥펑 과일차 (저당)</b> <span class="code">PR-261020-000C</span></div>
+                  <div class="weak">기준 조사 RS-261020-000C · 2026-10-20 · 옵션 3개 · 배송비는 옵션 용량으로 자동 계산</div>
+                </div>
+                <button class="btn btn-ghost btn-sm">← 이전 제품</button>
+                <button class="btn btn-ghost btn-sm">다음 대기 제품 →</button>
+              </div>
+
+              <div class="bulk">
+                <b style="font-size:14px">한 번에 맞추기</b>
+                <div class="pill"><span class="on">목표 차익</span><span>목표 마진</span><span>판매가</span></div>
+                <div class="ninput num">3,000</div><span class="sub">원</span>
+                <div class="pill"><span class="on">전체</span><span>쿠팡</span><span>네이버</span></div>
+                <button class="btn btn-secondary btn-sm">적용</button>
+                <span class="weak" style="margin-left:auto">100원 단위로 올려서 계산</span>
+              </div>
+
+              <table class="ptable">
+                <thead>
+                  <tr>
+                    <th style="width:36%"><span class="weak">옵션 · 원가</span></th>
+                    <th><div class="plat">쿠팡 <span class="badge b-done" style="margin-left:4px">저장됨</span></div><div class="fees">수수료 11.66% · 결제 0% · 평균 마진 <b>8.7%</b> · 최저 차익 <b>3,051원</b></div></th>
+                    <th><div class="plat">네이버 <span class="badge b-done" style="margin-left:4px">저장됨</span></div><div class="fees">수수료 3% · 결제 3.63% · 평균 마진 <b>9.2%</b> · 최저 차익 <b>3,032원</b></div></th>
+                  </tr>
+                </thead>
+                <tbody id="priceRows"></tbody>
+              </table>
+
+              <div class="savebar">
+                <span class="weak">쿠팡은 옵션마다 판매가, 네이버는 최저 옵션가 33,000원을 대표가로 하고 나머지는 추가금으로 등록해요</span>
+                <span class="sp"></span>
+                <button class="btn btn-secondary">되돌리기</button>
+                <button class="btn btn-primary">저장</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ============ 나머지 화면 (구조만) ============ -->
+          <div data-screen="other" hidden>
+            <div class="page-head"><div><h1 id="otherTitle">배송비</h1><p>기존 화면 내용을 그대로 이 틀 안에 넣어요</p></div></div>
+            <div class="panel"><div class="panel-body sub" style="padding:60px;text-align:center">기존 화면 내용이 이 자리에 그대로 들어가요.<br />바뀌는 건 왼쪽 메뉴, 위쪽 바, 넓은 화면 배치예요.</div></div>
+          </div>
+
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===================== 모바일 ===================== -->
+  <div id="mobile" hidden>
+    <div class="note">
+      <b>모바일:</b> 아래 탭 바로 주요 메뉴에 바로 가요 (홈 · 제품 · 가격조사 · 가격 책정 · 더보기). 설정과 관리는 '더보기'에 넣어요. 제품 추가는 오른쪽 아래 + 버튼으로 해요.
+    </div>
+    <div class="phones">
+      <div class="phone"><div class="phone-in">
+        <div class="p-status"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="p-top"><h2>홈</h2><span class="sp"></span><span class="fxchip" style="height:30px"><span class="dot"></span>200원</span></div>
+        <div class="p-body">
+          <div class="p-kpis">
+            <div class="panel"><div class="sub">조사한 제품</div><div class="v">20</div></div>
+            <div class="panel"><div class="sub">가격 책정 대기</div><div class="v" style="color:var(--color-warning)">12</div></div>
+          </div>
+          <div class="p-sec">할 일</div>
+          <div class="panel">
+            <div class="todo" style="padding:12px 14px"><div class="grow"><b>판매가 안 정한 제품 12개</b><span class="sub">목표 차익으로 한 번에</span></div><span class="link">정하기</span></div>
+            <div class="todo" style="padding:12px 14px"><div class="grow"><b>환율이 기본값이에요</b><span class="sub">오늘 환율을 저장하세요</span></div><span class="link">저장</span></div>
+          </div>
+          <div class="p-sec">최근 제품<span class="sp"></span><span class="link">전체</span></div>
+          <div class="panel p-list" id="mRecent"></div>
+        </div>
+        <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+        <nav class="p-tabs" id="mTabs1"></nav>
+      </div></div>
+
+      <div class="phone"><div class="phone-in">
+        <div class="p-status"><span>9:41</span><span>●●● ▮</span></div>
+        <div class="p-top"><h2>제품조사</h2><span class="sp"></span><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+        <div class="p-body">
+          <div class="chips"><select class="select" style="flex:1"><option>가격 책정: 전체</option></select><select class="select" style="flex:1"><option>최근 순</option></select></div>
+          <div class="panel p-list" id="mProducts"></div>
+        </div>
+        <div class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></div>
+        <nav class="p-tabs" id="mTabs2"></nav>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const IMG = (p) => 'https://agc-fe.vercel.app/api/files/photos/2026/10/' + p + '.jpg'
+  // 실제 DB 값 (2026-10-20 기준). priced = 쿠팡·네이버 판매가 저장 여부
+  const PRODUCTS = [
+    { id: 43, code: 'PR-261020-000C', ko: '둥펑 과일차 (저당)', cn: '东鹏 果之茶 低糖果味茶饮料', img: '5178ac2c7ac54f1993f480d61ada6615', opts: 3, min: 59.9, priced: true, date: '2026-10-20' },
+    { id: 42, code: 'PR-261020-000B', ko: '통일 하이즈옌 전해질 음료', cn: '统一 海之言 等渗电解质饮料', img: '1a942573416d4f848fc8a1e43c1d6944', opts: 4, min: 45.7, priced: true, date: '2026-10-20' },
+    { id: 41, code: 'PR-261020-000A', ko: '강사부 빙탕쉐리 배 음료', cn: '康师傅 冰糖雪梨 梨汁饮品', img: '25728c02884748f3b02dd4038666dad2', opts: 5, min: 25.9, priced: false, date: '2026-10-20' },
+    { id: 40, code: 'PR-261020-0009', ko: '통일 샤오밍퉁쉐 냉침 과일차', cn: '统一 小茗同学 冷泡果味茶饮料', img: '8cf7835ca9d0449d9d3fec86e659c8a3', opts: 4, min: 57.9, priced: false, date: '2026-10-20' },
+    { id: 39, code: 'PR-261020-0008', ko: '젠리바오 오렌지꿀맛 스포츠음료 (캔)', cn: '健力宝 橙蜜味 运动饮料', img: '42ee0ebdea72488398f3f619ca57b6ec', opts: 3, min: 53.9, priced: false, date: '2026-10-20' },
+    { id: 38, code: 'PR-261020-0007', ko: '북빙양 귤맛 탄산음료 (캔)', cn: '北冰洋 桔汁汽水 碳酸饮料', img: '80018ffd91bd416b95ddfbf502ae44c2', opts: 4, min: 27, priced: false, date: '2026-10-20' },
+    { id: 37, code: 'PR-261020-0006', ko: '루루 행인로 아몬드 음료', cn: '露露 杏仁露 植物蛋白饮料', img: '0e6c512e10954035b26e2289260b94b1', opts: 4, min: 65, priced: false, date: '2026-10-20' },
+    { id: 36, code: 'PR-261020-0005', ko: '육개핵도 호두우유 (정품형)', cn: '六个核桃 精品型核桃乳 植物蛋白饮料', img: 'fd6009e8af0f4445b4fc6757768072cb', opts: 3, min: 74.9, priced: false, date: '2026-10-20' },
+    { id: 35, code: 'PR-261020-0004', ko: '비타소이 오리지널 두유', cn: '维他奶 原味豆奶 植物蛋白饮料', img: '156e2364aabc4311be0267b932828bf0', opts: 1, min: 58.8, priced: false, date: '2026-10-20' },
+    { id: 34, code: 'PR-261020-0003', ko: '왕왕 왕자이 우유 (캔 밀크)', cn: '旺旺 旺仔牛奶 调制乳', img: 'e7daee19dc3a48469ec2ce164430116a', opts: 2, min: 59.9, priced: false, date: '2026-10-20' },
+  ]
+  const badge = (p) => p.priced ? '<span class="badge b-done">완료</span>' : '<span class="badge b-wait">대기</span>'
+
+  document.getElementById('productRows').innerHTML = PRODUCTS.map((p) => `
+    <tr data-go="detail">
+      <td><div class="pcell"><img class="thumb" src="${IMG(p.img)}" alt="" /><div style="min-width:0"><div class="ttl">${p.ko}</div><div class="weak">${p.cn}</div></div></div></td>
+      <td><span class="code">${p.code}</span></td>
+      <td class="r num">${p.opts}종류</td>
+      <td class="r num">¥${p.min.toFixed(2)}</td>
+      <td>${badge(p)}</td>
+      <td class="weak num">${p.date}</td>
+    </tr>`).join('')
+
+  const rowHtml = (p) => `
+    <div class="row" data-go="detail"><img class="thumb" src="${IMG(p.img)}" alt="" />
+      <div class="grow"><div class="ttl">${p.ko}</div><div class="weak">${p.code} · 옵션 ${p.opts} · ¥${p.min}~</div></div>${badge(p)}</div>`
+  document.getElementById('recentList').innerHTML = PRODUCTS.slice(0, 5).map(rowHtml).join('')
+  document.getElementById('mRecent').innerHTML = PRODUCTS.slice(0, 4).map(rowHtml).join('')
+  document.getElementById('mProducts').innerHTML = PRODUCTS.slice(0, 8).map(rowHtml).join('')
+
+  // 상세 — 사진 모음 (대표 + 맛별, 없는 맛은 빈 칸으로 표시)
+  const PHOTOS = [
+    { img: '5178ac2c7ac54f1993f480d61ada6615', label: '대표' },
+    { img: '368145950ec4446b8cbabf796aceaaa7', label: '레몬 홍차' },
+    { img: '0ec4d4d1ebf44c959e026bb385f2cd2b', label: '복숭아 우롱차' },
+    { img: null, label: '자몽 재스민차' },
+  ]
+  const hero = document.getElementById('hero')
+  const renderThumbs = (sel) => {
+    hero.src = IMG(PHOTOS[sel].img)
+    document.getElementById('thumbs').innerHTML = PHOTOS.map((ph, i) => ph.img
+      ? `<figure class="${i === sel ? 'on' : ''}" data-ph="${i}"><img src="${IMG(ph.img)}" alt="" /><figcaption>${ph.label}</figcaption></figure>`
+      : `<figure><div class="empty">사진 없음</div><figcaption>${ph.label}</figcaption></figure>`).join('')
+  }
+  renderThumbs(0)
+  document.getElementById('thumbs').addEventListener('click', (e) => {
+    const f = e.target.closest('[data-ph]'); if (f) renderThumbs(Number(f.dataset.ph))
+  })
+
+  const OPTS = [
+    { n: '레몬 홍차', img: '368145950ec4446b8cbabf796aceaaa7' },
+    { n: '복숭아 우롱차', img: '0ec4d4d1ebf44c959e026bb385f2cd2b' },
+    { n: '자몽 재스민차', img: null },
+  ]
+  document.getElementById('optRows').innerHTML = OPTS.map((o) => `
+    <tr><td><div class="pcell">${o.img ? `<img class="thumb" style="width:36px;height:36px" src="${IMG(o.img)}" alt="" />` : '<div class="thumb" style="width:36px;height:36px"></div>'}<b>${o.n}</b></div></td>
+    <td>500ml×24병</td><td class="r num">¥59.90</td><td class="r num">34,900원 <span class="weak">· 8.7%</span></td><td class="r num">33,000원 <span class="weak">· 9.2%</span></td></tr>`).join('')
+
+  document.getElementById('priceRows').innerHTML = OPTS.map((o) => `
+    <tr>
+      <td><div class="pcell">${o.img ? `<img class="thumb" style="width:40px;height:40px" src="${IMG(o.img)}" alt="" />` : '<div class="thumb" style="width:40px;height:40px"></div>'}
+        <div><b>${o.n} / 500ml×24병</b><div class="weak">¥59.9 + 배송 ¥79 (12.5kg) · 원가+배송 27,780원</div></div></div></td>
+      <td><div class="ninput num">34,900</div><div class="mbar"><i style="width:35%"></i></div><div class="weak" style="margin-top:4px">차익 <b class="pos">3,051원</b> · 8.7%</div></td>
+      <td><div style="display:flex;align-items:center"><div class="ninput num">33,000</div><span class="tag">대표가</span></div><div class="mbar"><i style="width:37%"></i></div><div class="weak" style="margin-top:4px">차익 <b class="pos">3,032원</b> · 9.2%</div></td>
+    </tr>`).join('')
+
+  // 모바일 탭 바
+  const TABS = [
+    ['홈', '<path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>'],
+    ['제품', '<path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8M12 13v8"/>'],
+    ['가격조사', '<path d="m6 4 6 8 6-8M12 12v8M8 12h8M8 16h8"/>'],
+    ['가격 책정', '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/>'],
+    ['더보기', '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>'],
+  ]
+  const tabs = (on) => TABS.map(([l, d], i) => `<span class="${i === on ? 'on' : ''}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${d}</svg>${l}</span>`).join('')
+  document.getElementById('mTabs1').innerHTML = tabs(0)
+  document.getElementById('mTabs2').innerHTML = tabs(1)
+
+  // 화면 이동
+  const NOTES = {
+    home: '<b>홈 → 대시보드</b><ol><li>큰 메뉴 타일 7개 대신 <b>왼쪽 고정 메뉴</b>를 둬요. 어느 화면에서든 바로 이동할 수 있어서 \'이전\' 버튼을 계속 누를 필요가 없어요.</li><li>메뉴를 업무 순서로 묶어요: 소싱(제품조사·가격조사) → 판매(가격 책정·상품 등록·주문) → 설정.</li><li>홈에는 숫자 현황, 단계별 진행, <b>할 일</b>(가격 책정 대기 12개, 환율 기본값)을 보여줘요. 숫자는 실제 DB 값이에요.</li></ol>',
+    products: '<b>제품조사 목록 → 표</b><ol><li>사진·이름·코드·옵션 수·최저가·<b>가격 책정 상태</b>를 한 줄에 보여줘요.</li><li>검색과 드롭다운 필터(가격 책정 완료/대기), 정렬, 페이지 넘김을 넣어요.</li><li>행을 누르면 상세로 가요. (목업에서도 클릭돼요)</li></ol>',
+    detail: '<b>제품 상세 → 왼쪽 사진, 오른쪽 정보</b><ol><li>큰 사진 + 맛별 사진 줄. 사진이 없는 맛은 \'사진 없음\'으로 보여서 빠진 걸 바로 알 수 있어요. 아래 작은 사진을 누르면 위 큰 사진이 바뀌어요.</li><li>쿠팡·네이버 판매가와 차익을 바로 보여주고, 아래 탭에서 옵션별로 비교해요.</li></ol>',
+    pricing: '<b>가격 책정 → 같은 틀 안에서</b><ol><li>지금 화면 구성은 거의 그대로 두고 틀만 정리했어요. 한 번에 맞추기는 <b>목표 차익</b>이 기본이에요.</li><li><b>다음 대기 제품 →</b> 버튼을 추가해서 12개를 목록으로 돌아가지 않고 연달아 처리할 수 있어요.</li></ol>',
+    other: '<b>배송비 · 환율 · 회사 계정 · 사용자 관리</b>: 기존 내용은 그대로 두고, 공통 틀(왼쪽 메뉴 + 위쪽 바) 안에 넣기만 해요.',
+  }
+  const CRUMB = { home: '<b>홈</b>', products: '소싱 / <b>제품조사</b>', detail: '소싱 / 제품조사 / <b>둥펑 과일차 (저당)</b>', pricing: '판매 / <b>가격 책정</b>' }
+  const OTHER = { shipping: ['배송비', '설정'], fx: ['환율', '설정'], accounts: ['회사 계정', '설정'], users: ['사용자 관리', '설정'], surveys: ['가격조사', '소싱'] }
+  const navKey = { detail: 'products' }
+
+  function go(key) {
+    let screen = key
+    if (OTHER[key]) {
+      screen = 'other'
+      document.getElementById('otherTitle').textContent = OTHER[key][0]
+      document.getElementById('crumb').innerHTML = `${OTHER[key][1]} / <b>${OTHER[key][0]}</b>`
+    } else {
+      document.getElementById('crumb').innerHTML = CRUMB[key]
+    }
+    document.querySelectorAll('[data-screen]').forEach((el) => (el.hidden = el.dataset.screen !== screen))
+    document.querySelectorAll('.nav-item[data-go]').forEach((el) => el.classList.toggle('on', el.dataset.go === (navKey[key] || key)))
+    document.getElementById('note').innerHTML = NOTES[screen]
+    document.querySelector('.main').scrollTop = 0
+  }
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-go]'); if (t) go(t.dataset.go)
+    const d = e.target.closest('[data-device]')
+    if (d) {
+      document.querySelectorAll('[data-device]').forEach((b) => b.classList.toggle('on', b === d))
+      document.getElementById('desktop').hidden = d.dataset.device !== 'desktop'
+      document.getElementById('mobile').hidden = d.dataset.device !== 'mobile'
+    }
+  })
+  go(new URLSearchParams(location.search).get('s') || 'home')
+</script>
+</body>
+</html>
