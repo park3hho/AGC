@@ -316,39 +316,57 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ---
 
 ### GET /company-accounts — 회사 계정 목록
-타오바오·쿠팡·네이버 등 회사가 쓰는 외부 서비스 계정. **목록에는 비밀번호가 없다.**
+타오바오·쿠팡·네이버·식품안전나라 등 회사가 쓰는 외부 서비스 계정. **목록에는 비밀번호가 없다.** 삭제한 계정은 나오지 않는다.
 - 권한: `account_view`
 - Query: `usage` (선택 — 이 용도가 붙은 계정만, 정확히 일치)
-- 정렬: 최근 추가 순
+- 정렬: 플랫폼 이름 순 → 최근 추가 순
 - Response 200: `{"status": "success", "items": [CompanyAccount]}`
 
 ### POST /company-accounts — 회사 계정 추가
 - 권한: `account_edit`
 - Request
   ```json
-  {"platform": "타오바오", "login_id": "agc_buyer01", "password": "********", "usages": ["소싱"]}
+  {"platform": "식품안전나라", "login_id": "agc01", "password": "********", "usages": ["인허가"], "url": "https://www.foodsafetykorea.go.kr"}
   ```
   | 필드 | 필수 | 규칙 |
   |---|---|---|
-  | `platform` | ✅ | 1~100자 |
+  | `platform` | ✅ | 1~100자, **자유 입력** (정해진 목록 없음. FE 제안 목록은 자동완성일 뿐) |
   | `login_id` | ✅ | 1~200자 |
   | `password` | ✅ | 1~500자. BE 가 암호화해서 저장 (응답·로그에 나오지 않음) |
   | `usages` | | 문자열 배열, 각 1~30자, 최대 10개, 중복은 하나로 합침. 기본 `[]` |
-- Response 200: `{"status": "success", "account": CompanyAccount}`
+  | `url` | | 홈페이지. http/https 만, 500자 이하. `www.…` 처럼 주소만 보내면 `https://` 를 붙여 저장. 빈 값·`null` = 없음 |
+- Response 200: `{"status": "success", "account": CompanyAccount}` · 422 (주소 형식 오류 등)
+
+### GET /company-accounts/{account_id} — 회사 계정 한 건 (수정 화면용)
+- 권한: `account_view`
+- Response 200: `{"status": "success", "account": CompanyAccount}` · 404 (없거나 삭제됨)
+
+### PATCH /company-accounts/{account_id} — 회사 계정 수정
+보낸 필드만 바꾼다.
+- 권한: `account_edit`
+- Request: POST 와 같은 필드, 전부 선택. `password` 는 **보냈을 때만** 새로 암호화해 바꾼다 (안 보내면 그대로). `url` 에 `null`·`""` 을 보내면 지운다. `platform`·`login_id`·`usages` 에 `null` 은 422.
+- Response 200: `{"status": "success", "account": CompanyAccount}` · 400 (바꿀 필드 없음) · 404
+
+### DELETE /company-accounts/{account_id} — 회사 계정 삭제 (소프트)
+목록·열람·수정에서 사라진다. 비밀번호 열람 기록을 남기려고 행은 지우지 않는다 (`deleted_at`).
+- 권한: `account_edit`
+- Response 200: `{"status": "success"}` · 404 (없거나 이미 삭제됨)
 
 ### GET /company-accounts/{account_id}/password — 비밀번호 보기
 한 건씩만 복호화해서 준다. **부를 때마다 열람 기록**(누가·언제·어느 계정·IP)이 남는다.
 - 권한: `account_view`
 - Response 200: `{"status": "success", "password": "..."}`
-- Response 404
+- Response 404 (없거나 삭제됨)
 
 **CompanyAccount**
 ```json
 {
-  "id": 1, "platform": "타오바오", "login_id": "agc_buyer01", "usages": ["소싱"],
+  "id": 1, "platform": "식품안전나라", "login_id": "agc01", "usages": ["인허가"],
+  "url": "https://www.foodsafetykorea.go.kr",
   "created_at": "2026-10-18T13:00:00+00:00", "updated_at": "2026-10-18T13:00:00+00:00"
 }
 ```
+- `url` 은 없으면 `null`.
 
 ---
 
@@ -427,6 +445,15 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 현재 환율 = 날짜(KST) 최근 기록. 기록이 없으면 기본값 200 (`source: "default"`, `date: null`).
 - Response 200: `{"status": "success", "current": FxRate, "history": [FxRate]}` — `history` 는 날짜 최근 순 최대 30건 (기본값은 들어가지 않음)
 
+### POST /exchange-rate/refresh — 지금 받아오기
+환율을 바로 받아와 오늘(KST) 값으로 저장한다. **오늘 직접 입력한 값이 있어도 받은 값으로 바꾼다.**
+- 권한: `research`
+- 출처: 하나은행 고시 매매기준율(네이버 금융 데이터) → 안 되면 open.er-api. BE `core/pricing_config.FX_*`
+- Response 200: `{"status": "success", "current": FxRate, "history": [FxRate], "fetched": {"cny_krw": "198.4400", "source": "hana", "observed_at": "2026-10-21T08:50:32+09:00"}}`
+- Response 502: 모든 출처에서 못 받음 (마지막 저장값은 그대로)
+
+**자동 받기**: BE 가 켜질 때와 매시간 같은 출처에서 받아 오늘 값을 갱신한다. 단 그날 직접 입력(`manual`)한 값이 있으면 자동으로는 덮어쓰지 않는다.
+
 ### PUT /exchange-rate — 오늘 환율 직접 입력
 오늘(KST) 날짜로 저장한다. 같은 날 다시 넣으면 덮어쓴다 (하루 1건). 바로 현재 환율이 된다.
 - 권한: `research`
@@ -437,7 +464,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ```json
 {"cny_krw": "201.3500", "date": "2026-10-20", "source": "manual", "updated_at": "2026-10-20T03:00:00+00:00"}
 ```
-- `source`: `manual` (직접 입력) · `default` (기록이 없어 기본값 — DB 에 없는 값). 환율 API 를 붙이면 API 이름이 추가된다.
+- `source`: `hana` (하나은행 고시, 자동) · `open_er_api` (open.er-api, 자동 예비) · `manual` (직접 입력 — 그날은 자동으로 안 바뀜) · `default` (기록이 없어 기본값 — DB 에 없는 값).
 
 ### GET /shipping-fees/rule — 배송비 요금표 (무게 구간별)
 배송비 화면이 쓴다. 제품과 상관없이 요금 규칙 + 무게 구간별 위안 요금 + 현재 환율만 준다. 원화 환산은 FE 가 `fx` 로 한다 (환율을 바꾸면 원화도 바뀐다).
