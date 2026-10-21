@@ -613,8 +613,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 
 가격 책정이 끝난 제품의 상세페이지(S1~S6 템플릿, 폭 860px)를 만들고 **사람이 한 번 확인(휴먼 체크)해서 승인**한다. 상품 등록은 승인된 상세페이지만 받는다. 규칙: BE `DESIGN.md` §6.4.
 - 상태 `status`: `draft` 초안 · `review` 검수 대기 · `approved` 승인 · `changes` 수정 필요. 목록 필터에는 `none`(상세페이지 없음)도 쓴다.
-- 확인 표시: 문자열 안의 `[[...]]` — 사람이 채우거나 확정해야 하는 자리. 하나라도 남으면 승인 불가.
-- 휴먼 체크 항목 `checks`: `reg_no` 등록번호 확인 · `ingredients` 원재료를 실제 라벨과 대조 · `photo_promo` 사진 속 중국 현지 프로모·문구 확인 · `claims` 효능·과장 표현 없음 · `draft_copy` 가안 문구 확정.
+- 확인 표시: 문자열 안의 `[[...]]` — 사람이 채우거나 확정해야 하는 자리. 남아 있어도 승인은 되고 FE 가 경고만 보여준다 (이미지에 그대로 나감).
+- 문구 표기: 줄바꿈 = 줄 · `*글자*` = 파란 강조(헤드라인) · `_{글자}` = 아래첨자 (예: `VB_{6}`, 2026-10-22).
+- **휴먼 체크 = 사람이 미리보기를 보고 '확인' 한 번** (2026-10-22 사용자 결정, 5개 체크리스트 폐지). '확인' = `approve` (상태 이름은 그대로 `approved` 승인).
 
 ### GET /detail-pages — 상세페이지 목록
 가격 책정 완료(모든 판매처 판매가 저장) 제품 + 상세페이지 상태.
@@ -641,8 +642,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
     "page": DetailPage | null,
     "template": DetailContent,
     "photos": [{"url": "/files/photos/…", "label": "대표"}],
-    "common": DetailCommon,
-    "checks": ["reg_no", "ingredients", "photo_promo", "claims", "draft_copy"]
+    "common": DetailCommon
   }
   ```
 - `page: null` = 아직 없음. `template` = 제품 이름 · 최근 가격 조사 옵션(option1 = 맛, option2 = 용량·입수) · 옵션별 사진으로 채운 처음 값 (저장 안 된 상태, 사람이 쓸 칸은 `[[...]]`). 페이지가 있어도 준다 ("템플릿으로 다시 채우기"용).
@@ -669,11 +669,12 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - **승인된 페이지의 content 가 바뀌면 검수 대기로 돌아간다** (`reset` 기록). 내용이 같으면 상태를 바꾸지 않는다.
 - Response 200: `{"status": "success", "page": DetailPage}` · 404 (제품 없음) · 409 (첫 저장이 동시에 겹침)
 
-### POST /detail-pages/{product_id}/approve — 승인 (휴먼 체크)
+### POST /detail-pages/{product_id}/approve — 확인 (휴먼 체크 = 승인)
 - 권한: `detail_review` — **API 키 불가 (사람만)**
-- Request: `{"checks": ["reg_no", "ingredients", "photo_promo", "claims", "draft_copy"], "note": null}`
-- 400: 검수 대기가 아님 · 체크 항목이 빠짐 · 등록번호가 비었거나 자리표시(`0000-0000000`) · 확인 표시 `[[...]]` 가 content 나 공통 안내에 남음
-- Response 200: `{"status": "success", "page": DetailPage}` — `reviewed_by` · `reviewed_at` · `review_checks` 가 채워진다
+- Request: `{"note": null}` — `checks` 는 예전 호환용으로 받기만 하고 무시한다 (2026-10-22)
+- `draft` · `review` · `changes` 어디서든 바로 `approved`. 등록번호 미입력 · 확인 표시 `[[...]]` 남음은 **막지 않는다** (FE 가 경고만)
+- 400: 이미 승인됨 · 404: 상세페이지 없음
+- Response 200: `{"status": "success", "page": DetailPage}` — `reviewed_by` · `reviewed_at` 가 채워진다 (`review_checks` 는 예전 기록용, 새로는 null)
 
 ### POST /detail-pages/{product_id}/exports — 상세 이미지(JPG 조각) 저장 — 2026-10-22
 - 권한: `detail_review` — **API 키 불가 (사람만)**
@@ -703,7 +704,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   "reg_no_ready": false, "marker_count": 4, "updated_at": "…"
 }
 ```
-- `reg_no_ready` = 실제 등록번호가 들어 있음 (비었거나 `0`·`-` 만이면 false → 승인 불가). `marker_count` = 공통 안내에 남은 `[[...]]` 수.
+- `reg_no_ready` = 실제 등록번호가 들어 있음 (비었거나 `0`·`-` 만이면 false → FE 가 '등록번호 미입력' 경고, 승인은 됨). `marker_count` = 공통 안내에 남은 `[[...]]` 수.
 
 ### PUT /detail-pages/common — 공통 안내 저장
 - 권한: `detail_review` (모든 상세페이지 · 등록번호에 걸려 있어 사람만)
