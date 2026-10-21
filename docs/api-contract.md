@@ -417,6 +417,38 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ```
 - 만료·재인증 알림(D-30 주의, D-14 위험)은 FE `utils/apiKey.keyStatuses` 가 계산한다.
 
+### 출고지·반품지 주소록 (`/shipping-addresses`) — 2026-10-22
+실제 장소 1곳 = 1행. 마켓(네이버·쿠팡) 주소록에서 받은 번호를 `market_codes` 에 묶는다. **상품 등록은 기본 출고지·기본 반품지의 마켓 번호를 쓴다.** 구매대행은 출고지가 해외(배대지)여야 한다 — 쿠팡 '구매대행' 배송, 네이버 해외직구 표시 · 개인통관고유부호 입력창 모두 해외 출고지 기준. 권한: 보기 `research`, 추가·수정·삭제 `account_edit`.
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/shipping-addresses` | 목록 (기본 출고지 → 기본 반품지 → 나머지). `{"items": [ShippingAddress]}` |
+| POST | `/shipping-addresses` | 추가. `{"address": ShippingAddress}` |
+| GET | `/shipping-addresses/{id}` | 한 건 · 404 |
+| PATCH | `/shipping-addresses/{id}` | 수정 — 보낸 필드만. 합친 결과를 다시 검사 (422). 400 바꿀 것 없음 · 404 |
+| DELETE | `/shipping-addresses/{id}` | 삭제 (소프트, 기본값도 풀림) · 404 |
+
+**ShippingAddress**
+```json
+{
+  "id": 3, "name": "집운 웨이하이 배대지", "country": "CN", "overseas": true,
+  "zip_code": "264205", "address": "山东省 威海市 …", "address_detail": "韩国海运集运", "phone": "+86…",
+  "uses": ["outbound"], "defaults": ["outbound"],
+  "market_codes": [{"market": "쿠팡", "use": "outbound", "code": "25556899", "name": "타오바오 공식 해운 집운 웨이하이"}],
+  "memo": null, "created_at": "...", "updated_at": "..."
+}
+```
+| 필드 | 필수 | 규칙 |
+|---|---|---|
+| `name` · `address` | ✅ | 100자 · 300자 |
+| `country` | | 2글자 국가 코드 (기본 `KR`). `KR` 이 아니면 `overseas: true` |
+| `uses` | ✅ | `outbound`(출고지) · `return`(반품지) 1개 이상 |
+| `defaults` | | `uses` 의 부분집합. **용도마다 기본은 1곳** — 저장하면 다른 주소의 같은 기본값이 풀린다 |
+| `market_codes` | | 최대 20개. `market` 자유 입력, `use` 는 `uses` 안에서, 같은 `market`+`use` 중복 불가 |
+| `zip_code` · `address_detail` · `phone` · `memo` | | 비우면 `null` |
+- PATCH 로 `uses` 를 줄이면(그리고 `defaults` · `market_codes` 를 안 보내면) 빠진 용도의 기본값·마켓 번호도 같이 빠진다.
+- 점검(기본 출고지가 해외인지, 마켓별 번호가 있는지)은 FE `utils/shippingAddress.addressChecks`.
+
 ---
 
 ### GET /products/{product_id}/pricing — 가격 책정 화면 데이터
