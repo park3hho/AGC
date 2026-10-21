@@ -57,6 +57,49 @@ description: 타오바오에서 팔 음료를 찾아 AGC 앱에 제품·사진·
 
 타오바오 화면은 로그인이 필요하다. **브라우저 창(built-in browser)에서 사용자가 로그인해 둔 상태로만** 본다. 로그인 화면이 나오면 멈추고 사용자에게 로그인해 달라고 한다 — 비밀번호를 대신 넣지 않는다.
 
+### 1-1. 캡챠·접속 차단 대응 (계정 보호)
+
+캡챠를 **무시하고 다른 페이지로 넘어가지 않는다.** 캡챠가 떠 있는데 계속 페이지를 열면 그게 가장 봇처럼 보이고 계정 제한으로 이어진다. 캡챠가 떠 있으면 상세 이미지·参数信息 도 가려져서 읽은 값도 틀린다.
+
+**확인 시점**: 검색, 다음 페이지, 상품 클릭(새 탭 포함) 등 페이지가 바뀔 때마다, 값을 읽기 **전에** 아래 `taobaoBlock(page)` 로 확인한다.
+
+```js
+async function taobaoBlock(page) {
+  if (/login\.(taobao|tmall)\.com/.test(page.url())) return { type: 'login' };
+  for (const f of page.frames()) {
+    const h = await f.locator('[id^="nc_"][id$="_n1z"], .btn_slide').first().boundingBox().catch(() => null);
+    if (h) return { type: 'slider', frame: f, handle: h };
+    if (/_____tmd_____|punish/.test(f.url())) return { type: 'challenge', frame: f };
+  }
+  const t = await page.evaluate(() => (document.body?.innerText || '').slice(0, 4000));
+  const m = t.match(/访问异常[^\n]*|请按住滑块[^\n]*|拖动到最右边[^\n]*|验证码[^\n]*/);
+  return m ? { type: 'text', hint: m[0] } : null;
+}
+```
+
+**걸리면** (`null` 이 아니면):
+1. 그 자리에서 멈춘다. 탭을 닫거나, 다른 주소로 이동하거나, 새 탭을 열지 않는다.
+2. **슬라이더**(请按住滑块，拖动到最右边): `captcha-solver` 스킬의 `captcha.drag` 로 한 번 푼다. 손잡이 가운데 → 트랙 오른쪽 끝 너머로, 단계는 30~50 사이 무작위, y 는 ±2px 흔든다.
+   ```js
+   const b = await taobaoBlock(page);
+   const track = await b.frame.locator('[id^="nc_"][id$="__scale_text"], .nc_scale').first().boundingBox();
+   const y = b.handle.y + b.handle.height / 2;
+   await captcha.drag(page, { x: b.handle.x + b.handle.width / 2, y },
+     { x: track.x + track.width + 8, y: y + (Math.random() * 4 - 2) }, { steps: 30 + Math.floor(Math.random() * 20) });
+   ```
+   3~5초 뒤 `taobaoBlock` 으로 다시 확인. "出错了 / 点击刷新" 이 나오면 그 글자를 눌러 새로 고친 뒤 **한 번만** 더 시도한다 (최대 2번).
+3. **2번 실패하거나, 그림 고르기·글자 입력 같은 다른 캡챠, 로그인 화면**이면 직접 풀려고 더 시도하지 않는다. `notification` 으로 "타오바오 인증 필요"를 알리고 사용자에게 브라우저에서 풀어 달라고 한다. 30초마다 `taobaoBlock` 으로 확인하며 기다리고(최대 10분), 그동안 다른 타오바오 페이지는 열지 않는다. 10분 넘으면 여기까지 결과를 보고하고 끝낸다.
+4. **통과한 뒤**: 1~2분 쉬고, 다음 10번의 동작은 간격을 두 배(10초 + 무작위)로 늘린다.
+5. 한 번 작업에서 캡챠가 **3번** 나오면 그날 타오바오 조사는 중단하고 보고한다.
+
+**예방**:
+- 상품 상세는 주소로 바로 열지 않는다(访问异常 이 잘 뜬다). 검색창에 입력 → 결과 클릭으로 연다.
+- 동작 사이 간격은 5초 + 무작위, 클릭 위치·누르는 시간도 무작위.
+- 타오바오 탭은 한 번에 하나만. 서브 에이전트로 동시에 여러 타오바오 페이지를 열지 않는다 (같은 로그인 계정).
+- 다 본 상품 탭은 닫고 다음으로 간다.
+
+보고에 **캡챠 몇 번, 어떻게 넘겼는지**(자동 통과 / 사용자 해결 / 중단)를 적는다.
+
 ## 2. 사진 검색
 
 규칙:
