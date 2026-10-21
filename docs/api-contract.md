@@ -18,8 +18,8 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 권한: 각 엔드포인트의 **권한** 줄. `없음` = 누구나, `로그인` = 로그인만, 그 밖은 필요한 Feature.
   | Role | 이름 | Feature |
   |---|---|---|
-  | `admin` | 관리자 | `research`, `account_view`, `account_edit`, `user_manage` |
-  | `member` | 직원 | `research`, `account_view` |
+  | `admin` | 관리자 | `research`, `account_view`, `account_edit`, `user_manage`, `detail_review` |
+  | `member` | 직원 | `research`, `account_view`, `detail_review` |
 
   Feature 문자열은 FE `constants/permissions.js` · BE `core/permissions.py` 와 같아야 한다.
 - 형식: 요청·응답 모두 JSON. 성공 응답은 `{"status": "success", ...}`.
@@ -519,3 +519,96 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   - `over_limit` = `billable_kg` 가 30kg 초과 (소형 한도 — 이 요금표로 못 보냄)
 - 용량을 못 읽으면 `volume_ml` · `weight_g` · `billable_kg` · `shipping_cny` 가 `null` → 옵션 이름에 `245ml×24` 처럼 적어야 계산된다.
 - 부피 무게 · 관세는 반영하지 않는다.
+---
+
+## 상세페이지 (디자인) · 휴먼 체크 — 2026-10-21
+
+가격 책정이 끝난 제품의 상세페이지(S1~S6 템플릿, 폭 860px)를 만들고 **사람이 한 번 확인(휴먼 체크)해서 승인**한다. 상품 등록은 승인된 상세페이지만 받는다. 규칙: BE `DESIGN.md` §6.4.
+- 상태 `status`: `draft` 초안 · `review` 검수 대기 · `approved` 승인 · `changes` 수정 필요. 목록 필터에는 `none`(상세페이지 없음)도 쓴다.
+- 확인 표시: 문자열 안의 `[[...]]` — 사람이 채우거나 확정해야 하는 자리. 하나라도 남으면 승인 불가.
+- 휴먼 체크 항목 `checks`: `reg_no` 등록번호 확인 · `ingredients` 원재료를 실제 라벨과 대조 · `photo_promo` 사진 속 중국 현지 프로모·문구 확인 · `claims` 효능·과장 표현 없음 · `draft_copy` 가안 문구 확정.
+
+### GET /detail-pages — 상세페이지 목록
+가격 책정 완료(모든 판매처 판매가 저장) 제품 + 상세페이지 상태.
+- 권한: `research`
+- Query: `status` (`none` · `draft` · `review` · `approved` · `changes`, 없으면 전체 — 그 밖은 400), `q` (코드·한국어·중국어 이름 검색)
+- 정렬: 제품 최근 추가 순. 페이지 넘김 없음 (FE 가 나눈다).
+- Response 200: `{"status": "success", "items": [{"product": Product, "page": DetailPageSummary | null}], "total": 20, "counts": {"none": 19, "draft": 0, "review": 1, "approved": 0, "changes": 0}}` — `counts` 는 필터와 상관없이 전체 기준 (홈 진행 단계 숫자)
+
+**DetailPageSummary**
+```json
+{
+  "status": "review", "updated_at": "…", "updated_by": {"id": 3, "name": "리서처 skill"},
+  "reviewed_at": null, "reviewed_by": null, "review_note": null
+}
+```
+
+### GET /detail-pages/{product_id} — 상세페이지 편집 화면 데이터
+- 권한: `research`
+- Response 200
+  ```json
+  {
+    "status": "success",
+    "product": Product,
+    "page": DetailPage | null,
+    "template": DetailContent,
+    "photos": [{"url": "/files/photos/…", "label": "대표"}],
+    "common": DetailCommon,
+    "checks": ["reg_no", "ingredients", "photo_promo", "claims", "draft_copy"]
+  }
+  ```
+- `page: null` = 아직 없음. `template` = 제품 이름 · 최근 가격 조사 옵션(option1 = 맛, option2 = 용량·입수) · 옵션별 사진으로 채운 처음 값 (저장 안 된 상태, 사람이 쓸 칸은 `[[...]]`). 페이지가 있어도 준다 ("템플릿으로 다시 채우기"용).
+- `photos` = 고를 수 있는 사진 (대표 사진 + 최근 조사 옵션 사진, 같은 파일 한 번).
+- Response 404 (제품 없음)
+
+**DetailPage** = DetailPageSummary + `{"id", "content": DetailContent, "review_checks": [..], "marker_count": 1, "reviews": [{"action": "submit|approve|changes|reset", "user": {"id","name"}|null, "note", "checks": [], "created_at"}]}` (`reviews` 최근 10건, 최근 순)
+
+**DetailContent** (모르는 키는 버리고 빠진 칸은 빈 값으로 저장)
+```json
+{
+  "hero": {"eyebrow": "", "headline": "첫 줄\n*강조* 둘째 줄", "name": "", "name_sub": "", "badges": [{"value": "0kcal", "label": "무설탕"}], "photo_url": "/files/…"},
+  "points": {"title": "이런 음료예요", "lead": "", "items": [{"title": "", "desc": "", "big": "0", "big_unit": "kcal / 병"}]},
+  "flavors": {"title": "맛을 골라주세요", "lead": "", "items": [{"name": "라임", "name_cn": "青柠口味", "desc": "", "chips": ["상큼"], "photo_url": "/files/…"}], "notes": [""]},
+  "info": {"title": "제품 정보", "rows": [{"label": "원재료", "value": ""}], "nutrition": [{"value": "0kcal", "label": "열량"}], "note": ""},
+  "howto": {"title": "이렇게 드세요", "items": [{"icon": "cold", "title": "", "desc": ""}]}
+}
+```
+- 줄바꿈 `\n` = 줄, `*글자*` = 파란 강조 (headline). 개수 한도: badges 4 · points 4 · flavors 12 · chips 4 · notes 4 · info rows 15 · nutrition 6 · howto 4. `icon`: `cold` · `run` · `bottle` · `cup` · `clock` · `sun`.
+
+### PUT /detail-pages/{product_id} — 저장 (없으면 초안으로 만든다)
+- 권한: `research`
+- Request: `{"content": DetailContent, "submit": false}` — `submit: true` 면 저장 후 검수 요청 (초안 · 수정 필요 → 검수 대기)
+- **승인된 페이지의 content 가 바뀌면 검수 대기로 돌아간다** (`reset` 기록). 내용이 같으면 상태를 바꾸지 않는다.
+- Response 200: `{"status": "success", "page": DetailPage}` · 404 (제품 없음) · 409 (첫 저장이 동시에 겹침)
+
+### POST /detail-pages/{product_id}/approve — 승인 (휴먼 체크)
+- 권한: `detail_review` — **API 키 불가 (사람만)**
+- Request: `{"checks": ["reg_no", "ingredients", "photo_promo", "claims", "draft_copy"], "note": null}`
+- 400: 검수 대기가 아님 · 체크 항목이 빠짐 · 등록번호가 비었거나 자리표시(`0000-0000000`) · 확인 표시 `[[...]]` 가 content 나 공통 안내에 남음
+- Response 200: `{"status": "success", "page": DetailPage}` — `reviewed_by` · `reviewed_at` · `review_checks` 가 채워진다
+
+### POST /detail-pages/{product_id}/request-changes — 수정 요청
+- 권한: `detail_review`
+- Request: `{"note": "원재료를 라임 라벨로 다시 확인해 주세요"}` (필수 — 비면 422)
+- 검수 대기 · 승인 상태에서만 (아니면 400). 상태 → `changes`.
+- Response 200: `{"status": "success", "page": DetailPage}`
+
+### GET /detail-pages/common — S6 공통 안내 · 등록번호
+- 권한: `research`
+- Response 200: `{"status": "success", "common": DetailCommon}`
+
+**DetailCommon**
+```json
+{
+  "reg_no": "", "seller": "이도식품", "notice_title": "해외구매대행 상품 안내",
+  "notice": [{"title": "배송 기간", "body": "결제 후 약 7~14일 [[가안]]"}],
+  "reg_no_ready": false, "marker_count": 4, "updated_at": "…"
+}
+```
+- `reg_no_ready` = 실제 등록번호가 들어 있음 (비었거나 `0`·`-` 만이면 false → 승인 불가). `marker_count` = 공통 안내에 남은 `[[...]]` 수.
+
+### PUT /detail-pages/common — 공통 안내 저장
+- 권한: `detail_review` (모든 상세페이지 · 등록번호에 걸려 있어 사람만)
+- Request: `{"reg_no": "", "seller": "", "notice_title": "", "notice": [{"title": "", "body": ""}]}` (notice 최대 10)
+- **값이 바뀌면 승인된 상세페이지를 전부 검수 대기로 되돌린다.**
+- Response 200: `{"status": "success", "common": DetailCommon, "reset_count": 0}`
