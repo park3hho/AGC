@@ -447,7 +447,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | `market_codes` | | 최대 20개. `market` 자유 입력, `use` 는 `uses` 안에서, 같은 `market`+`use` 중복 불가 |
 | `zip_code` · `address_detail` · `phone` · `memo` | | 비우면 `null` |
 - PATCH 로 `uses` 를 줄이면(그리고 `defaults` · `market_codes` 를 안 보내면) 빠진 용도의 기본값·마켓 번호도 같이 빠진다.
-- 점검(기본 출고지가 해외인지, 마켓별 번호가 있는지)은 FE `utils/shippingAddress.addressChecks`.
+- **FE 는 주소 하나만 쓴다** (구매대행은 출고지·반품지 모두 배대지): 기본 출고지 주소를 골라 `uses`·`defaults` 를 둘 다로 저장한다. BE 는 여러 주소를 받을 수 있게 그대로 둔다.
+- 점검(해외 주소인지, 마켓별 출고지·반품지 번호가 있는지)은 FE `utils/shippingAddress.addressChecks`.
+- 마켓 주소록 직접 변경: 네이버 커머스API 는 주소록 조회만 있고 등록·수정·삭제 API 가 없다 (스마트스토어센터에서만). 쿠팡은 출고지·반품지 생성·수정 API 가 있다 (반품지는 굿스플로 택배사 계약 정보 필수).
 
 ---
 
