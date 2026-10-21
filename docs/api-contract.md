@@ -615,7 +615,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - `photos` = 고를 수 있는 사진 (대표 사진 + 최근 조사 옵션 사진, 같은 파일 한 번).
 - Response 404 (제품 없음)
 
-**DetailPage** = DetailPageSummary + `{"id", "content": DetailContent, "review_checks": [..], "marker_count": 1, "reviews": [{"action": "submit|approve|changes|reset", "user": {"id","name"}|null, "note", "checks": [], "created_at"}]}` (`reviews` 최근 10건, 최근 순)
+**DetailPage** = DetailPageSummary + `{"id", "content": DetailContent, "review_checks": [..], "marker_count": 1, "content_hash": "sha256 hex", "exports": {"naver": DetailExport|null, "coupang": DetailExport|null}, "reviews": [{"action": "submit|approve|changes|reset", "user": {"id","name"}|null, "note", "checks": [], "created_at"}]}` (`reviews` 최근 10건, 최근 순)
 
 **DetailContent** (모르는 키는 버리고 빠진 칸은 빈 값으로 저장)
 ```json
@@ -640,6 +640,16 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - Request: `{"checks": ["reg_no", "ingredients", "photo_promo", "claims", "draft_copy"], "note": null}`
 - 400: 검수 대기가 아님 · 체크 항목이 빠짐 · 등록번호가 비었거나 자리표시(`0000-0000000`) · 확인 표시 `[[...]]` 가 content 나 공통 안내에 남음
 - Response 200: `{"status": "success", "page": DetailPage}` — `reviewed_by` · `reviewed_at` · `review_checks` 가 채워진다
+
+### POST /detail-pages/{product_id}/exports — 상세 이미지(JPG 조각) 저장 — 2026-10-22
+- 권한: `detail_review` — **API 키 불가 (사람만)**
+- Request: `multipart/form-data` — `platform` (`naver` | `coupang`), `content_hash` (그릴 때의 `page.content_hash`, 64자), `template` (FE 템플릿 버전, 선택), `files` (JPG 여러 개, 위에서부터 순서대로). 판매처 하나씩 올린다.
+- 검사: 조각 폭 = 판매처 폭 (`naver` 860 · `coupang` 780) · 높이 1~3000 · 1~20장 · 합계 10MB 이하 · JPEG.
+- 400: 승인(`approved`) 아님 · 폭/높이/개수 안 맞음 · 409: `content_hash` 가 지금 내용과 다름(그 사이 바뀜) 또는 동시 저장 겹침 · 413: 10MB 초과 · 415: JPG 아님 · 404
+- Response 200: `{"status": "success", "export": DetailExport}`
+
+**DetailExport** = `{"platform": "naver", "version": 1, "content_hash": "…", "current": true, "template": "s1-s6@2026-10-22", "files": [{"url": "/files/detail/PR-261019-0005/v1/PR-261019-0005_naver_01.jpg", "width": 860, "height": 2890, "size": 512345, "sha256": "…"}], "created_at", "created_by": {"id","name"}|null}`
+- `current` = 이 이미지가 지금 content + 공통 안내로 그린 것. 판매처마다 마지막 버전만 `page.exports` 에 온다. 상품 등록은 `approved` + `current` 인 것만 쓴다.
 
 ### POST /detail-pages/{product_id}/request-changes — 수정 요청
 - 권한: `detail_review`
