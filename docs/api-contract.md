@@ -368,6 +368,55 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ```
 - `url` 은 없으면 `null`.
 
+### API 키 (`/api-credentials`) — 2026-10-21
+로그인 계정(`/company-accounts`)과 따로 둔다. 외부 API 키 묶음 — 공개값(앱 ID·업체코드 등)은 그대로 주고, **비밀값은 이름만** 준다. 값은 한 개씩 열람 API 로만 받고 열람 기록이 남는다. 권한은 회사 계정과 같다 (보기·열람 `account_view`, 추가·수정·삭제 `account_edit`).
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/api-credentials` | 목록 (서비스 이름 순). `{"items": [ApiCredential]}` |
+| POST | `/api-credentials` | 추가. `{"credential": ApiCredential}` |
+| GET | `/api-credentials/{id}` | 한 건 (수정 화면용) · 404 |
+| PATCH | `/api-credentials/{id}` | 수정 — 보낸 필드만. 400 (바꿀 것 없음 · 값 없는 새 비밀값) · 404 |
+| DELETE | `/api-credentials/{id}` | 삭제 (소프트 — 열람 기록 보존) · 404 |
+| GET | `/api-credentials/{id}/secrets/{secret_id}` | 비밀값 한 개 보기 `{"value": "..."}` — **부를 때마다 열람 기록** · 404 |
+
+**Request (POST)**
+```json
+{
+  "service": "쿠팡 OpenAPI", "url": "https://wing.coupang.com",
+  "public_values": [{"label": "업체코드 (vendorId)", "value": "A0000000"}],
+  "secrets": [{"label": "Access Key", "value": "..."}, {"label": "Secret Key", "value": "..."}],
+  "issued_on": "2026-09-21", "expires_on": "2027-03-20",
+  "reauth_from": null, "reauth_to": null,
+  "allowed_ips": ["180.231.169.53"], "memo": "..."
+}
+```
+| 필드 | 필수 | 규칙 |
+|---|---|---|
+| `service` | ✅ | 1~100자, 자유 입력 |
+| `secrets` | ✅ | 1~10개, `label` 1~50자 겹치지 않게, `value` 1~2000자 (BE 가 암호화) |
+| `public_values` | | 0~10개, `label`·`value` 모두 필수, `label` 겹치지 않게 |
+| `url` | | 회사 계정 `url` 과 같은 규칙 |
+| `issued_on` · `expires_on` | | 날짜. 발급일 > 만료일이면 422 |
+| `reauth_from` · `reauth_to` | | 재인증 기간 (예: 네이버 커머스API 앱 인증). 시작 > 끝이면 422 |
+| `allowed_ips` | | IP 또는 CIDR, 최대 20개 |
+| `memo` | | 2000자 이하 |
+
+- **PATCH 의 `secrets`**: 보내면 그 목록으로 통째로 바꾼다. `value` 를 비운(`null`·`""`) 항목은 **같은 `label` 의 기존 값을 그대로** 쓴다 (열람 기록도 이어짐). 기존에 없던 `label` 인데 값이 없으면 400. 목록에서 빠진 비밀값은 지워진다.
+
+**ApiCredential**
+```json
+{
+  "id": 2, "service": "쿠팡 OpenAPI", "url": "https://wing.coupang.com",
+  "public_values": [{"label": "업체코드 (vendorId)", "value": "A0000000"}],
+  "secrets": [{"id": 3, "label": "Access Key"}, {"id": 4, "label": "Secret Key"}],
+  "issued_on": "2026-09-21", "expires_on": "2027-03-20", "reauth_from": null, "reauth_to": null,
+  "allowed_ips": ["180.231.169.53"], "memo": "...",
+  "created_at": "...", "updated_at": "..."
+}
+```
+- 만료·재인증 알림(D-30 주의, D-14 위험)은 FE `utils/apiKey.keyStatuses` 가 계산한다.
+
 ---
 
 ### GET /products/{product_id}/pricing — 가격 책정 화면 데이터
