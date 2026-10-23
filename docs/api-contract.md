@@ -417,6 +417,65 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ```
 - 만료·재인증 알림(D-30 주의, D-14 위험)은 FE `utils/apiKey.keyStatuses` 가 계산한다.
 
+### 회사 정보 › 기본 정보 (`/company-info`) — 2026-10-23
+회사 정보 = 기본 정보 · 로그인 계정(`/company-accounts`) · API 키(`/api-credentials`). **기본 정보는 로그인도 비밀값도 아닌 회사 정보 전부** — 사업자등록번호, 인허가·신고 번호, 계좌, 연락처, 서류. 값은 숨기지 않고(열람 기록 없음) 그대로 준다. 만료일이 있어도 API 키가 아니다 (개념으로 나눈다: 비밀값·재인증·허용 IP 가 있으면 API 키). 권한: 보기·파일 받기 `account_view`, 추가·수정·삭제·파일 올리기 `account_edit`.
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/company-info` | 목록 `{"items": [CompanyInfo], "links": [Link]}` — 분류 → `sort` → id 순 |
+| POST | `/company-info` | 추가 `{"item": CompanyInfo}` · 409 (같은 `link` 이미 있음) |
+| GET | `/company-info/{id}` | 한 건 (수정 화면용) · 404 |
+| PATCH | `/company-info/{id}` | 수정 — 보낸 필드만 · 400 (바꿀 것 없음) · 404 · 409 |
+| DELETE | `/company-info/{id}` | 삭제 (소프트, 파일도 같이 숨김) · 404 |
+| POST | `/company-info/{id}/files` | 서류 파일 올리기 (multipart `file`) `{"file": InfoFile}` — PDF·JPG·PNG·WEBP, 20MB, 항목당 10개 · 413 · 415 |
+| GET | `/company-info/{id}/files/{file_id}` | 파일 보기 (브라우저에서 바로 열림). **`/files/...` 공개 주소가 아니다** — 로그인 쿠키 필요 · 404 |
+| DELETE | `/company-info/{id}/files/{file_id}` | 파일 삭제 · 404 |
+
+**Request (POST)**
+```json
+{
+  "category": "인허가·신고", "name": "전자상거래업자부호", "value": "K-26-043299",
+  "details": [{"label": "발급처", "value": "유니패스"}],
+  "issuer": "관세청", "issued_on": null, "expires_on": "2029-10-13", "remind": true,
+  "url": "https://unipass.customs.go.kr", "link": "ecommerce_code", "sort": 30, "memo": "유효 3년"
+}
+```
+| 필드 | 필수 | 규칙 |
+|---|---|---|
+| `category` | ✅ | 1~30자, 자유 입력 (FE 추천: 사업자 · 인허가·신고 · 계좌 · 연락처 · 서류) |
+| `name` | ✅ | 1~100자 |
+| `value` | | 대표 값 (번호·계좌번호 등) 500자 이하. 서류처럼 파일만 있는 항목은 비움 |
+| `details` | | 세부 값 0~20개 `{label, value}` (은행·예금주·상호 등), `label` 겹치지 않게 |
+| `issuer` | | 발급기관 100자 이하 |
+| `issued_on` · `expires_on` | | 날짜. 발급일 > 만료일이면 422 |
+| `remind` | | 기본 `true`. 만료가 가까우면 홈 할 일에 띄울지 (납세증명서처럼 필요할 때 다시 떼는 서류는 `false`) |
+| `url` | | 회사 계정 `url` 과 같은 규칙 |
+| `link` | | 앱에서 이 값을 가져다 쓰는 곳. `links` 의 `key` 중 하나 또는 `null`. 항목 하나에만 붙는다 (걸려 있으면 409) |
+| `sort` | | 분류 안 순서 (작을수록 위), 기본 0 |
+| `memo` | | 2000자 이하 |
+
+**CompanyInfo**
+```json
+{
+  "id": 5, "category": "인허가·신고", "name": "전자상거래업자부호", "value": "K-26-043299",
+  "details": [], "issuer": "관세청", "issued_on": null, "expires_on": "2029-10-13", "remind": true,
+  "url": "https://unipass.customs.go.kr", "link": "ecommerce_code", "sort": 30, "memo": "유효 3년",
+  "files": [{"id": 9, "name": "전자상거래부호 캡쳐.png", "size": 48213, "content_type": "image/png", "created_at": "..."}],
+  "created_at": "...", "updated_at": "..."
+}
+```
+**Link** — `{"key": "food_agency_reg_no", "label": "수입식품등 인터넷구매대행업 영업등록번호", "used_by": "상세페이지 S6 등록번호"}`
+
+| `link` | 쓰는 곳 |
+|---|---|
+| `biz_reg_no` | 사업자등록번호 — 상품 등록(예정) |
+| `mail_order_no` | 통신판매업 신고번호 — 상품 등록(예정) |
+| `food_agency_reg_no` | 구매대행업 영업등록번호 — **상세페이지 S6 등록번호** (`GET /detail-pages/common` 의 `reg_no` 가 이 값을 쓴다) |
+| `ecommerce_code` | 전자상거래업자부호 — 통관(예정) |
+
+- 만료 배지는 API 키와 같은 기준(D-30 주의, D-14 위험)으로 FE `utils/companyInfo.infoStatus` 가 계산한다. 홈 할 일에는 `remind: true` 인 것만.
+- 파일은 공개 폴더(`/files`)가 아닌 `PRIVATE_DIR` 에 저장한다 (주민번호·계좌가 든 서류).
+
 ### 출고지·반품지 주소록 (`/shipping-addresses`) — 2026-10-22
 실제 장소 1곳 = 1행. 마켓(네이버·쿠팡) 주소록에서 받은 번호를 `market_codes` 에 묶는다. **상품 등록은 기본 출고지·기본 반품지의 마켓 번호를 쓴다.** 구매대행은 출고지가 해외(배대지)여야 한다 — 쿠팡 '구매대행' 배송, 네이버 해외직구 표시 · 개인통관고유부호 입력창 모두 해외 출고지 기준. 권한: 보기 `research`, 추가·수정·삭제 `account_edit`.
 
