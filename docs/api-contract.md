@@ -808,3 +808,39 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 검증 입력: 이름 = 수취인, 전화 = 쿠팡 `overseaShippingInfoDto.ordererPhoneNumber`(안심번호 아님) · 네이버 `shippingAddress.tel1`, 우편번호 = 수취인 5자리. 옛 6자리 우편번호·휴대폰 아님·일회용 부호(인증번호 없음)는 `missing`.
 - `pccc_status`: `ok` 일치 · `mismatch` 불일치(사유 `pccc_message`) · `missing` 자동 검증 못 함 · `error` 관세청 장애 · `pending`.
 - 자동 수집은 `ORDER_POLL_MINUTES`(기본 0 = 꺼짐).
+### 타오바오 구매 · 중국 내 배송 (`/taobao-purchases`) — 2026-10-24
+고객이 마켓에서 주문 → 우리가 타오바오에서 구매 → 판매처가 **집운 창고**까지 보내는 구간. 타오바오 주문번호 1개(판매처 1곳) = 구매 1건. 마켓 주문과 **다대다** — 한 마켓 주문을 여러 타오바오 주문으로 사거나, 타오바오 주문 하나로 여러 마켓 주문을 같이 살 수 있다. 권한 `order`. 국제 발송(집운 → 한국)은 범위 밖.
+
+**추적성** — 추가·수정·연결 변경·삭제마다 **연결된 마켓 주문마다** `OrderEvent` 한 줄: `kind` = `purchase_created` · `purchase_changed` · `purchase_linked` · `purchase_unlinked` · `purchase_deleted`, `data.changes` = `{칸: {"from": 이전값, "to": 새값}}` (개인정보 없음). 값이 그대로면 기록하지 않는다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/taobao-purchases?order_id=&cn_status=&limit=` | 목록 (최근 먼저) `{"items": [Purchase], "cn_status": {키: 이름}}` |
+| POST | `/taobao-purchases` | 추가 `{"purchase": Purchase}` · 404 (없는 마켓 주문) · 409 (같은 타오바오 주문번호가 이미 있음 → 그 구매에 연결) |
+| GET | `/taobao-purchases/{id}` | 한 건 · 404 |
+| PATCH | `/taobao-purchases/{id}` | 수정 — 보낸 칸만. `orders` 를 보내면 연결을 그 목록으로 통째로 바꾼다 (1개 이상) · 400 · 404 · 409 |
+| DELETE | `/taobao-purchases/{id}` | 삭제 (소프트, 기록은 남음) · 404 |
+
+**Request (POST)**
+```json
+{
+  "orders": [{"order_id": 2, "quantity": 1}],
+  "taobao_order_no": "4123456789012345678", "shop_name": "元气森林旗舰店",
+  "item_url": "https://detail.tmall.com/item.htm?id=...",
+  "items": [{"name": "원味 600ml×15", "qty": 1, "price_cny": "39.90"}],
+  "paid_cny": "35.50", "purchased_at": "2026-10-24T18:00:00+09:00",
+  "cn_status": "ordered", "shipped_at": null, "cn_courier": null, "cn_tracking_no": null,
+  "arrived_at": null, "warehouse_ref": null, "memo": null
+}
+```
+| 필드 | 필수 | 규칙 |
+|---|---|---|
+| `orders` | ✅ | 1~50개, 같은 주문 두 번 금지. `quantity` = 이 마켓 주문 몫 수량(모르면 null) |
+| `taobao_order_no` | | 40자, 공백 제거. 살아 있는 구매끼리 겹치면 409 |
+| `items` | | 0~30줄 `{name, qty 1~9999, price_cny}` — 옵션(맛·용량)·수량·단가 |
+| `paid_cny` | | 실제 결제 위안 (할인·배송비 반영 합계) |
+| `cn_status` | | `ordered` 주문함 · `shipped` 판매처 발송 · `arrived` 집운 창고 입고 · `problem` 문제 · `cancelled` 취소·환불. **`shipped`·`arrived` 로 바꿀 때 시각이 비어 있으면 지금 시각**을 넣는다 |
+| `cn_courier` · `cn_tracking_no` | | 중국 택배사 · 운송장 (공백 제거) |
+| `warehouse_ref` | | 집운 입고 번호 (있으면) |
+
+**Purchase** — 위 칸 + `id` · `purchased_by` `{id, name}`(추가한 사람) · `status_source` (`manual` · 나중에 폴링이 채우면 `poll`) · `status_checked_at` · `orders` `[{id, market, order_no, line_no, product_name, option_name, quantity, stage, link_quantity}]` · `created_at` · `updated_at`.
