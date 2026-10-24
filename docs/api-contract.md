@@ -794,11 +794,13 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ### 주문 (`/orders`) — 2026-10-24
 마켓(네이버·쿠팡) 주문을 받아 저장하고, 새 주문·수취인 정보가 바뀐 주문은 **바로 통관부호를 검증**한다 (UNI-PASS API028). 권한 `order` (관리자·직원, API 키 불가). 수취인 전화·주소·통관부호와 마켓 원본 응답은 암호화 저장, 응답에는 가린 값만.
 
+**고객 주문 번호 = 두 가지** — ① **자사 주문 코드** `code` = `OR-YYMMDD-XXXX` (날짜 = 마켓 주문일 KST, 16진 순번, `utils/code_gen`). 수집해서 새 주문을 만들 때 발급하고 `OrderEvent(kind=code_issued)` 를 남긴다. ② **마켓 주문번호** `order_no` (네이버 orderId · 쿠팡 orderId) + 줄 번호 `line_no`.
+
 **추적성** — 주문에 무엇이 일어나든 `OrderEvent` 한 줄: `actor_type`(system 폴링 · agent API 키 · user 로그인) · `via` · `kind`(collected · changed · pccc_check …) · `summary` · `data`(보낸 값·받은 값, 개인정보는 가림). 지우거나 고치지 않는다. 수집 1번은 `OrderSyncRun`(구간 · 받은/새/변경/검증 건수 · 성공 여부).
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/orders?stage=received&market=&pccc=&page=&size=` | 목록 + `pccc_counts` + 마켓별 `last_runs` + `poll_minutes` |
+| GET | `/orders?stage=received&market=&pccc=&q=&page=&size=` | 목록 + `pccc_counts` + 마켓별 `last_runs` + `poll_minutes`. `q` = 자사 코드(`OR-…`) · 마켓 주문번호 · 줄 번호 검색 |
 | POST | `/orders/collect` | 지금 가져오기. body `{"markets": ["naver","coupang"], "since_hours": null}` — 비우면 지난 수집 끝 −10분부터(처음이면 3일). 409 = 이미 수집 중 |
 | GET | `/orders/sync-runs?market=&limit=` | 수집 기록 |
 | GET | `/orders/{id}` | `{"order": Order, "events": [OrderEvent]}` (최신 먼저) |
@@ -809,38 +811,36 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - `pccc_status`: `ok` 일치 · `mismatch` 불일치(사유 `pccc_message`) · `missing` 자동 검증 못 함 · `error` 관세청 장애 · `pending`.
 - 자동 수집은 `ORDER_POLL_MINUTES`(기본 0 = 꺼짐).
 ### 타오바오 구매 · 중국 내 배송 (`/taobao-purchases`) — 2026-10-24
-고객이 마켓에서 주문 → 우리가 타오바오에서 구매 → 판매처가 **집운 창고**까지 보내는 구간. 타오바오 주문번호 1개(판매처 1곳) = 구매 1건. 마켓 주문과 **다대다** — 한 마켓 주문을 여러 타오바오 주문으로 사거나, 타오바오 주문 하나로 여러 마켓 주문을 같이 살 수 있다. 권한 `order`. 국제 발송(집운 → 한국)은 범위 밖.
+고객이 마켓에서 주문 → 우리가 타오바오에서 구매 → 판매처가 **집운 창고**까지 보내는 구간. **타오바오 주문번호 하나로 식별**하고, **고객 주문(MarketOrder) 1건에 붙는 기록**이다. 기본은 고객 주문 1건 = 타오바오 주문 1건 (같은 고객 주문에 여러 개 붙는 것은 막지 않음). 권한 `order`. 집운 쪽 매칭(입고 번호 등)·국제 발송은 범위 밖 — 나중에 따로.
 
-**추적성** — 추가·수정·연결 변경·삭제마다 **연결된 마켓 주문마다** `OrderEvent` 한 줄: `kind` = `purchase_created` · `purchase_changed` · `purchase_linked` · `purchase_unlinked` · `purchase_deleted`, `data.changes` = `{칸: {"from": 이전값, "to": 새값}}` (개인정보 없음). 값이 그대로면 기록하지 않는다.
+**추적성** — 추가·수정·삭제마다 그 고객 주문의 `OrderEvent` 한 줄: `kind` = `purchase_created` · `purchase_changed` · `purchase_deleted`, `data.changes` = `{칸: {"from": 이전값, "to": 새값}}` (개인정보 없음). 값이 그대로면 기록하지 않는다.
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/taobao-purchases?order_id=&cn_status=&limit=` | 목록 (최근 먼저) `{"items": [Purchase], "cn_status": {키: 이름}}` |
-| POST | `/taobao-purchases` | 추가 `{"purchase": Purchase}` · 404 (없는 마켓 주문) · 409 (같은 타오바오 주문번호가 이미 있음 → 그 구매에 연결) |
+| GET | `/taobao-purchases?order_id=&cn_status=&q=&limit=` | 목록 (최근 먼저) `{"items": [Purchase], "cn_status": {키: 이름}}` — `q` = 타오바오 주문번호 검색 |
+| POST | `/taobao-purchases` | 추가 `{"purchase": Purchase}` · 404 (없는 고객 주문) · 409 (같은 타오바오 주문번호가 이미 있음) |
 | GET | `/taobao-purchases/{id}` | 한 건 · 404 |
-| PATCH | `/taobao-purchases/{id}` | 수정 — 보낸 칸만. `orders` 를 보내면 연결을 그 목록으로 통째로 바꾼다 (1개 이상) · 400 · 404 · 409 |
+| PATCH | `/taobao-purchases/{id}` | 수정 — 보낸 칸만 (붙은 고객 주문은 못 바꿈, 잘못 붙였으면 삭제 후 다시) · 400 · 404 · 409 |
 | DELETE | `/taobao-purchases/{id}` | 삭제 (소프트, 기록은 남음) · 404 |
 
-**Request (POST)**
+**Request (POST)** — `order_id` · `taobao_order_no` 만 필수, 나머지는 선택
 ```json
 {
-  "orders": [{"order_id": 2, "quantity": 1}],
-  "taobao_order_no": "4123456789012345678", "shop_name": "元气森林旗舰店",
-  "item_url": "https://detail.tmall.com/item.htm?id=...",
-  "items": [{"name": "원味 600ml×15", "qty": 1, "price_cny": "39.90"}],
+  "order_id": 2, "taobao_order_no": "4123456789012345678",
+  "shop_name": "元气森林旗舰店", "item_url": "https://detail.tmall.com/item.htm?id=...",
+  "items": [{"name": "라임 600ml×15", "qty": 1, "price_cny": "39.90"}],
   "paid_cny": "35.50", "purchased_at": "2026-10-24T18:00:00+09:00",
-  "cn_status": "ordered", "shipped_at": null, "cn_courier": null, "cn_tracking_no": null,
-  "arrived_at": null, "warehouse_ref": null, "memo": null
+  "cn_status": "ordered", "shipped_at": null, "cn_courier": null, "cn_tracking_no": null, "arrived_at": null,
+  "memo": null
 }
 ```
 | 필드 | 필수 | 규칙 |
 |---|---|---|
-| `orders` | ✅ | 1~50개, 같은 주문 두 번 금지. `quantity` = 이 마켓 주문 몫 수량(모르면 null) |
-| `taobao_order_no` | | 40자, 공백 제거. 살아 있는 구매끼리 겹치면 409 |
+| `order_id` | ✅ | 고객 주문 id |
+| `taobao_order_no` | ✅ | 40자, 공백 제거. 살아 있는 구매끼리 겹치면 409 |
 | `items` | | 0~30줄 `{name, qty 1~9999, price_cny}` — 옵션(맛·용량)·수량·단가 |
 | `paid_cny` | | 실제 결제 위안 (할인·배송비 반영 합계) |
-| `cn_status` | | `ordered` 주문함 · `shipped` 판매처 발송 · `arrived` 집운 창고 입고 · `problem` 문제 · `cancelled` 취소·환불. **`shipped`·`arrived` 로 바꿀 때 시각이 비어 있으면 지금 시각**을 넣는다 |
-| `cn_courier` · `cn_tracking_no` | | 중국 택배사 · 운송장 (공백 제거) |
-| `warehouse_ref` | | 집운 입고 번호 (있으면) |
+| `cn_status` | | `ordered` 주문함 · `shipped` 판매처 발송 · `arrived` 집운 창고 입고 · `problem` 문제 · `cancelled` 취소·환불. **`shipped`·`arrived` 로 바꿀 때 시각이 비어 있으면 지금 시각** |
+| `cn_courier` · `cn_tracking_no` | | 중국 택배사 · 운송장 (운송장은 공백 제거) |
 
-**Purchase** — 위 칸 + `id` · `purchased_by` `{id, name}`(추가한 사람) · `status_source` (`manual` · 나중에 폴링이 채우면 `poll`) · `status_checked_at` · `orders` `[{id, market, order_no, line_no, product_name, option_name, quantity, stage, link_quantity}]` · `created_at` · `updated_at`.
+**Purchase** — 위 칸 + `id` · `order` `{id, code, market, order_no, line_no, product_name, option_name, quantity}` · `purchased_by` `{id, name}`(등록한 사람) · `status_source` (`manual` · 나중에 폴링이 채우면 `poll`) · `status_checked_at` · `created_at` · `updated_at`.
