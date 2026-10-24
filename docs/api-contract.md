@@ -735,14 +735,14 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 400: 이미 승인됨 · 404: 상세페이지 없음
 - Response 200: `{"status": "success", "page": DetailPage}` — `reviewed_by` · `reviewed_at` 가 채워진다 (`review_checks` 는 예전 기록용, 새로는 null)
 
-### POST /detail-pages/{product_id}/exports — 상세 이미지(JPG 조각) 저장 — 2026-10-22
+### POST /detail-pages/{product_id}/exports — 상세 이미지 조각 저장 — 2026-10-22 (형식 2026-10-24: 네이버 PNG · 쿠팡 JPG)
 - 권한: `detail_review` — **API 키 불가 (사람만)**
-- Request: `multipart/form-data` — `platform` (`naver` | `coupang`), `content_hash` (그릴 때의 `page.content_hash`, 64자), `template` (FE 템플릿 버전, 선택), `files` (JPG 여러 개, 위에서부터 순서대로). 판매처 하나씩 올린다.
-- 검사: 조각 폭 = 판매처 폭 (`naver` 860 · `coupang` 780) · 높이 1~3000 · 1~20장 · 합계 10MB 이하 · JPEG.
-- 400: 승인(`approved`) 아님 · 폭/높이/개수 안 맞음 · 409: `content_hash` 가 지금 내용과 다름(그 사이 바뀜) 또는 동시 저장 겹침 · 413: 10MB 초과 · 415: JPG 아님 · 404
+- Request: `multipart/form-data` — `platform` (`naver` | `coupang`), `content_hash` (그릴 때의 `page.content_hash`, 64자), `template` (FE 템플릿 버전, 선택), `files` (네이버는 PNG · 쿠팡은 JPG 여러 개, 위에서부터 순서대로). 판매처 하나씩 올린다.
+- 검사: 형식 = 판매처 형식 (`naver` PNG · `coupang` JPEG, 파일 내용으로 판단) · 조각 폭 = 판매처 폭 (`naver` 860 · `coupang` 780) · 높이 1~3000 · 장당 `naver` 20MB · `coupang` 10MB 이하 · `coupang` 높이 합계 30,000px 이하 · 1~20장 · 합계 45MB 이하.
+- 400: 승인(`approved`) 아님 · 폭/높이/개수 안 맞음 · 409: `content_hash` 가 지금 내용과 다름(그 사이 바뀜) 또는 동시 저장 겹침 · 413: 장당/합계 크기 초과 · 415: 판매처 형식 아님 · 404
 - Response 200: `{"status": "success", "export": DetailExport}`
 
-**DetailExport** = `{"platform": "naver", "version": 1, "content_hash": "…", "current": true, "template": "s1-s6@2026-10-22", "files": [{"url": "/files/detail/PR-261019-0005/v1/PR-261019-0005_naver_01.jpg", "width": 860, "height": 2890, "size": 512345, "sha256": "…"}], "created_at", "created_by": {"id","name"}|null}`
+**DetailExport** = `{"platform": "naver", "version": 1, "content_hash": "…", "current": true, "template": "s1-s6@2026-10-24", "files": [{"url": "/files/detail/PR-261019-0005/v1/PR-261019-0005_naver_01.png", "width": 860, "height": 2890, "size": 512345, "sha256": "…"}], "created_at", "created_by": {"id","name"}|null}`
 - `current` = 이 이미지가 지금 content + 공통 안내로 그린 것. 판매처마다 마지막 버전만 `page.exports` 에 온다. 상품 등록은 `approved` + `current` 인 것만 쓴다.
 
 ### POST /detail-pages/{product_id}/request-changes — 수정 요청
