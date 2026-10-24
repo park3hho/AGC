@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>가격 책정 (제품) 목업 — 후보 A · B · C</title>
+<style>
+  .pick { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin: 0 0 10px; font-size: 13px; }
+  .pick button { padding: 4px 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted-foreground, #8b95a1); font: inherit; font-weight: 600; cursor: pointer; }
+  .pick button.on { color: var(--foreground, #191f28); border-bottom-color: var(--foreground, #191f28); }
+  .pick .sp { flex: 1; }
+  .pick-note { margin: 0 0 10px; color: var(--muted-foreground, #8b95a1); font-size: 12px; }
+
+  /* AGC 앱 토큰 — 기본 / 넷러너 */
+  .app {
+    --color-primary: #3182f6; --color-primary-bg: #e8f3ff; --color-on-primary: #fff;
+    --color-danger: #f04452; --color-success: #0a7a3e; --color-warning: #a35c00; --color-accent: #3182f6;
+    --color-text: #191f28; --color-text-sub: #4e5968; --color-text-weak: #8b95a1;
+    --color-border: #e5e8eb; --color-border-strong: #d9dee5; --color-bg: #fff; --color-bg-sub: #f2f4f6; --color-bg-app: #f7f8fa;
+    --color-naver: #03c75a; --color-coupang: #e52528; --shadow-pop: 0 12px 40px rgba(0,0,0,.18); --radius: 2px;
+    position: relative; display: flex; flex-direction: column; height: 560px; overflow: hidden;
+    border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text);
+    font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 13px;
+  }
+  .app[data-theme='netrunner'] {
+    --color-primary: #ff4b55; --color-primary-bg: rgba(255,75,85,.12); --color-on-primary: #0b0d10;
+    --color-danger: #ff4b55; --color-success: #43e3ff; --color-warning: #f2e94e; --color-accent: #43e3ff;
+    --color-text: #ecebe8; --color-text-sub: #a3a9b2; --color-text-weak: #6d747e;
+    --color-border: #262a31; --color-border-strong: #353a43; --color-bg: #12151a; --color-bg-sub: #1a1e24; --color-bg-app: #0b0d10;
+    --shadow-pop: 0 0 0 1px #353a43, 0 16px 48px rgba(0,0,0,.6); --radius: 0px;
+  }
+  .app * { box-sizing: border-box; }
+  .app button, .app input, .app select { font: inherit; color: inherit; }
+  .num { font-variant-numeric: tabular-nums; }
+  .weak { color: var(--color-text-weak); }
+  .sub { color: var(--color-text-sub); }
+  .acc { color: var(--color-accent); font-weight: 600; }
+  .sp { flex: 1; }
+  .cand { display: none; flex: 1; min-height: 0; flex-direction: column; }
+  .cand.on { display: flex; }
+
+  /* 머리 한 줄 (모든 후보 공통) */
+  .head { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 14px; border-bottom: 1px solid var(--color-border); background: var(--color-bg-app); }
+  .head img { width: 34px; height: 34px; object-fit: cover; border-radius: var(--radius); }
+  .head h1 { margin: 0; font-size: 15px; font-weight: 700; }
+  .head .meta { font-size: 12px; }
+  .tlink { white-space: nowrap; border: 0; background: none; padding: 0; color: var(--color-text-sub); font-size: 12px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .tlink:hover { color: var(--color-primary); }
+  .btn { height: 30px; padding: 0 12px; white-space: nowrap; border: 1px solid var(--color-border-strong); border-radius: var(--radius); background: var(--color-bg); font-size: 12px; font-weight: 600; cursor: pointer; }
+  .btn.primary { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
+  .btn:disabled { opacity: .45; cursor: default; }
+
+  /* 입력 */
+  .in { width: 96px; height: 30px; padding: 0 8px; border: 1px solid var(--color-border-strong); border-radius: var(--radius); background: var(--color-bg); text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .in:focus { outline: 0; border-color: var(--color-primary); }
+  .in.dirty { border-color: var(--color-warning); }
+  .sel { height: 30px; padding: 0 6px; border: 1px solid var(--color-border-strong); border-radius: var(--radius); background: var(--color-bg); }
+  .dot { font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .dot::before { content: '● '; }
+  .dot.ok { color: var(--color-success); } .dot.dirty { color: var(--color-warning); } .dot.none { color: var(--color-text-weak); }
+
+  /* 표 */
+  table.t { width: 100%; border-collapse: collapse; }
+  table.t th { padding: 7px 12px; border-bottom: 1px solid var(--color-border); color: var(--color-text-weak); font-size: 11px; font-weight: 600; text-align: left; white-space: nowrap; }
+  table.t td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; white-space: nowrap; }
+  table.t .r { text-align: right; }
+  .mini { display: block; margin-top: 2px; font-size: 11px; color: var(--color-text-weak); }
+  .mini .good { color: var(--color-success); } .mini .bad { color: var(--color-danger); }
+  .addon { font-size: 11px; font-weight: 600; color: var(--color-text-sub); }
+  .addon.over { color: var(--color-danger); }
+  [data-tip] { cursor: help; border-bottom: 1px dashed var(--color-text-weak); }
+
+  /* 아래 고정 바 */
+  .foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 50px; padding: 8px 14px; border-top: 1px solid var(--color-border); background: var(--color-bg-app); }
+  .foot .lbl { color: var(--color-text-weak); font-size: 12px; }
+
+  /* 구성 막대 · 오버레이 */
+  .stack { display: flex; height: 8px; overflow: hidden; border-radius: var(--radius); background: var(--color-bg-sub); }
+  .stack i { display: block; height: 100%; }
+  .legend { display: grid; grid-template-columns: 8px 1fr auto; gap: 3px 8px; align-items: center; margin-top: 8px; font-size: 12px; }
+  .legend i { width: 8px; height: 8px; border-radius: var(--radius); }
+  .legend b { font-variant-numeric: tabular-nums; }
+  .tip { position: absolute; z-index: 30; width: 230px; padding: 12px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-bg); box-shadow: var(--shadow-pop); font-size: 12px; pointer-events: none; display: none; }
+  .tip.on { display: block; }
+  .tip h4 { margin: 0 0 8px; font-size: 12px; color: var(--color-text-sub); }
+
+  /* B — 판매처 탭 + 오른쪽 */
+  .b-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 190px; }
+  #b-side .row { flex-wrap: wrap; }
+  #b-table th, #b-table td { padding-left: 8px; padding-right: 8px; }
+  #b-table .in { width: 84px; }
+  .b-main { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--color-border); }
+  .ttabs { display: flex; gap: 18px; padding: 0 14px; border-bottom: 1px solid var(--color-border); }
+  .ttabs button { height: 38px; padding: 0; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--color-text-weak); font-weight: 700; cursor: pointer; }
+  .ttabs button.on { color: var(--color-text); border-bottom-color: var(--color-text); }
+  .ttabs .dot { margin-left: 4px; }
+  .scroll { flex: 1; min-height: 0; overflow: auto; }
+  .side { display: flex; flex-direction: column; min-height: 0; overflow: auto; }
+  .blk { padding: 12px 14px; border-bottom: 1px solid var(--color-border); }
+  .blk h5 { margin: 0 0 8px; color: var(--color-text-weak); font-size: 11px; font-weight: 600; }
+  .kv { display: flex; justify-content: space-between; padding: 2px 0; }
+  .kv b { font-variant-numeric: tabular-nums; }
+  .row { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+
+  /* C — 옵션 목록 + 계산 칸 */
+  .c-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 300px; }
+  .c-list { min-height: 0; overflow: auto; border-right: 1px solid var(--color-border); }
+  .c-opt { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--color-border); cursor: pointer; }
+  .c-opt:hover { background: var(--color-bg-sub); }
+  .c-opt.on { box-shadow: inset 2px 0 0 var(--color-primary); background: var(--color-bg-sub); }
+  .c-opt .p { text-align: right; min-width: 74px; }
+  .c-calc { min-height: 0; overflow: auto; }
+  .mk { padding: 12px 14px; border-bottom: 1px solid var(--color-border); }
+  .mk-h { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .mk-h b { font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="pick" id="pick">
+  <button data-c="a" class="on">A · 표 하나 + 아래 고정 바</button>
+  <button data-c="b">B · 판매처 탭 + 오른쪽 요약</button>
+  <button data-c="c">C · 옵션 고르고 계산 칸</button>
+  <span class="sp"></span>
+  <button data-t="">기본</button><button data-t="netrunner">넷러너</button>
+</div>
+<p class="pick-note" id="note"></p>
+
+<div class="app" id="app">
+  <div class="head" id="head"></div>
+  <section class="cand on" id="cand-a">
+    <div class="scroll"><table class="t" id="a-table"></table></div>
+    <div class="foot" id="a-foot"></div>
+  </section>
+  <section class="cand" id="cand-b">
+    <div class="b-body">
+      <div class="b-main"><div class="ttabs" id="b-tabs"></div><div class="scroll"><table class="t" id="b-table"></table></div></div>
+      <div class="side" id="b-side"></div>
+    </div>
+  </section>
+  <section class="cand" id="cand-c">
+    <div class="foot" id="c-bulk" style="border-top:0;border-bottom:1px solid var(--color-border)"></div>
+    <div class="c-body"><div class="c-list" id="c-list"></div><div class="c-calc" id="c-calc"></div></div>
+    <div class="foot" id="c-foot"></div>
+  </section>
+  <div class="tip" id="tip"></div>
+</div>
+
+<script>
+const FX = 198.83, UNIT = 100;
+const PHOTO = 'https://agc-fe.vercel.app/api/files/photos/2026/10/80018ffd91bd416b95ddfbf502ae44c2.jpg';
+const P = [{ key: 'coupang', label: '쿠팡' }, { key: 'naver', label: '네이버' }];
+const OPTS = [
+  { id: 63, o1: '귤맛', o2: '330ml×6캔', cny: 27, ship: 39, kg: '2.5' },
+  { id: 64, o1: '오렌지맛', o2: '330ml×6캔', cny: 27, ship: 39, kg: '2.5' },
+  { id: 65, o1: '귤+오렌지 혼합', o2: '330ml×12캔', cny: 54, ship: 47, kg: '4.5' },
+  { id: 66, o1: '귤+오렌지 혼합', o2: '330ml×24캔', cny: 103, ship: 63, kg: '8.5' },
+];
+const SAVED = { coupang: [18400, 18400, 26300, 42000], naver: [17400, 17400, 24900, 38800] };
+const S = {
+  prices: { coupang: [...SAVED.coupang], naver: [...SAVED.naver] },
+  fee: { coupang: { p: 11.66, pay: 0 }, naver: { p: 3, pay: 3.63 } },
+  bulk: { mode: 'profit', value: 3000, target: 'all' },
+  tab: 'coupang', sel: 0,
+};
+const NOTES = {
+  a: '지금 화면과 같은 한 표지만 글자를 줄임: 판매처 머리에 상태 점·수수료만, 칸 안에는 판매가 입력 + 차익·마진 한 줄. 한 번에 맞추기·저장은 아래 고정 바 한 줄. 원가·차익은 마우스를 올리면 구성.',
+  b: '판매처 하나씩 탭으로 (상태 점 = 저장됨/변경 N). 표 칸이 넓어져 차익·마진·네이버 추가금·상품 번호까지 한 줄. 오른쪽에 요약·한 번에 맞추기·수수료·저장.',
+  c: '옵션을 고르면 오른쪽 계산 칸에서 쿠팡·네이버 판매가를 넣고 구성 막대를 바로 봄. 옵션이 적고 하나씩 꼼꼼히 정할 때 편함. 한 번에 맞추기는 위, 저장은 아래.',
+};
+
+const won = (n) => (n == null || !isFinite(n) ? '-' : Math.round(n).toLocaleString('ko-KR') + '원');
+const wn = (n) => Math.round(n).toLocaleString('ko-KR');
+const cost = (o) => (o.cny + o.ship) * FX;
+const feeRate = (k) => (S.fee[k].p + S.fee[k].pay) / 100;
+const calc = (i, k) => {
+  const sale = S.prices[k][i]; if (!sale) return null;
+  const o = OPTS[i], fee = sale * feeRate(k), profit = sale - cost(o) - fee;
+  return { sale, goods: o.cny * FX, ship: o.ship * FX, fee, profit, margin: profit / sale * 100 };
+};
+const dirtyCount = (k) => S.prices[k].filter((v, i) => v !== SAVED[k][i]).length;
+const status = (k) => { const d = dirtyCount(k); return d ? `<span class="dot dirty">변경 ${d}</span>` : '<span class="dot ok">저장됨</span>'; };
+const totalDirty = () => P.reduce((s, p) => s + dirtyCount(p.key), 0);
+const mgCls = (m) => (m < 0 ? 'bad' : m >= 15 ? 'good' : '');
+const target = (o, k) => {
+  const c = cost(o), r = feeRate(k), v = S.bulk.value;
+  const raw = S.bulk.mode === 'profit' ? (c + v) / (1 - r) : c / (1 - r - v / 100);
+  return Math.ceil(raw / UNIT - 1e-9) * UNIT;
+};
+
+// 네이버 대표가 + 추가금 (한도 넘으면 용량·입수별로 상품 나눔) — utils/pricing.naverListingPlan 축약
+const LIMITS = [{ min: 10000, lo: -50, hi: 50 }, { min: 2000, lo: -50, hi: 100 }, { min: 0, lo: 0, hi: 100 }];
+const range = (b) => { const r = LIMITS.find((x) => b >= x.min); return { lo: Math.ceil(b * r.lo / 100), hi: Math.floor(b * r.hi / 100) }; };
+const fits = (b, g) => { const r = range(b.sale); return g.every((x) => x.sale - b.sale >= r.lo && x.sale - b.sale <= r.hi); };
+const baseOf = (g) => [...g].sort((a, b) => a.sale - b.sale).find((b) => fits(b, g));
+const naverPlan = () => {
+  const items = OPTS.map((o, i) => ({ i, sale: S.prices.naver[i], pack: o.o2 })).filter((x) => x.sale);
+  let groups = baseOf(items) ? [items] : [...items.reduce((m, x) => m.set(x.pack, [...(m.get(x.pack) || []), x]), new Map()).values()];
+  groups.sort((a, b) => Math.min(...a.map((x) => x.sale)) - Math.min(...b.map((x) => x.sale)));
+  const by = {};
+  groups.forEach((g, n) => { const b = baseOf(g) || g[0]; const r = range(b.sale); g.forEach((x) => { const amt = x.sale - b.sale; by[x.i] = { no: n + 1, amt, base: x === b, over: amt < r.lo || amt > r.hi }; }); });
+  return { by, count: groups.length };
+};
+const addonText = (a, many) => !a ? '' : `<span class="addon ${a.over ? 'over' : ''}">${many ? `상품 ${a.no} · ` : ''}${a.base ? '대표' : (a.amt >= 0 ? '+' : '−') + wn(Math.abs(a.amt))}</span>`;
+
+const stack = (r) => {
+  const parts = [['상품', r.goods, 'color-mix(in srgb, var(--color-primary) 28%, var(--color-bg))'], ['배송', r.ship, 'color-mix(in srgb, var(--color-primary) 55%, var(--color-bg))'], ['수수료', r.fee, 'var(--color-border-strong)'], ['차익', r.profit, 'var(--color-primary)']];
+  return `<div class="stack">${parts.map(([, v, c]) => `<i style="width:${Math.max(0, v) / r.sale * 100}%;background:${c}"></i>`).join('')}</div><div class="legend">${parts.map(([k, v, c]) => `<i style="background:${c}"></i><span>${k}</span><b>${won(v)}</b>`).join('')}</div>`;
+};
+
+function renderHead() {
+  document.getElementById('head').innerHTML = `<img src="${PHOTO}" alt=""><div><h1>북빙양 귤맛 탄산음료 (캔)</h1><div class="meta weak">PR-261020-0007 · 옵션 4 · 환율 <span class="acc num">198.83</span>원 (261024)</div></div><span class="sp"></span><a class="tlink" href="#">배송비</a><a class="tlink" href="#">환율</a><button class="btn">다음 제품 →</button>`;
+}
+const bulkControls = (vertical) => `
+  <select class="sel" data-bulk="mode"><option value="profit" ${S.bulk.mode === 'profit' ? 'selected' : ''}>목표 차익</option><option value="margin" ${S.bulk.mode === 'margin' ? 'selected' : ''}>목표 마진</option></select>
+  <input class="in" style="width:80px" data-bulk="value" value="${S.bulk.value}"><span class="weak">${S.bulk.mode === 'profit' ? '원' : '%'}</span>
+  ${vertical ? '' : `<select class="sel" data-bulk="target"><option value="all">쿠팡·네이버</option><option value="coupang">쿠팡만</option><option value="naver">네이버만</option></select>`}
+  <button class="btn" data-act="apply">적용</button>`;
+const saveControls = () => `<span class="${totalDirty() ? 'dot dirty' : 'dot ok'}">${totalDirty() ? `저장 안 된 변경 ${totalDirty()}건` : '저장됨'}</span><button class="btn" data-act="revert" ${totalDirty() ? '' : 'disabled'}>되돌리기</button><button class="btn primary" data-act="save" ${totalDirty() ? '' : 'disabled'}>저장</button>`;
+
+function renderA() {
+  const plan = naverPlan();
+  document.getElementById('a-table').innerHTML = `<tr><th>옵션</th><th class="r">원가</th>${P.map((p) => `<th>${p.label} ${status(p.key)} <span class="weak" style="font-weight:400">· 수수료 ${S.fee[p.key].p + S.fee[p.key].pay}%</span></th>`).join('')}</tr>`
+    + OPTS.map((o, i) => `<tr><td><b>${o.o1}</b> <span class="weak">${o.o2}</span></td><td class="r num"><span data-tip="cost:${i}">${won(cost(o))}</span></td>${P.map((p) => {
+      const r = calc(i, p.key), dirty = S.prices[p.key][i] !== SAVED[p.key][i];
+      return `<td><input class="in ${dirty ? 'dirty' : ''}" data-price="${p.key}:${i}" value="${S.prices[p.key][i] ? wn(S.prices[p.key][i]) : ''}"> ${p.key === 'naver' ? addonText(plan.by[i], plan.count > 1) : ''}<span class="mini num">${r ? `<span data-tip="sale:${p.key}:${i}">차익 ${wn(r.profit)}</span> · <span class="${mgCls(r.margin)}">${r.margin.toFixed(1)}%</span>` : '판매가를 넣어 주세요'}</span></td>`;
+    }).join('')}</tr>`).join('');
+  document.getElementById('a-foot').innerHTML = `<span class="lbl">한 번에 맞추기</span>${bulkControls(false)}<span class="sp"></span>${saveControls()}`;
+}
+
+function renderB() {
+  const k = S.tab, plan = naverPlan(), rs = OPTS.map((_, i) => calc(i, k)).filter(Boolean);
+  document.getElementById('b-tabs').innerHTML = P.map((p) => `<button data-tab="${p.key}" class="${k === p.key ? 'on' : ''}">${p.label}${status(p.key)}</button>`).join('');
+  document.getElementById('b-table').innerHTML = `<tr><th>옵션</th><th class="r">원가</th><th class="r">판매가</th>${k === 'naver' ? '<th>추가금</th>' : ''}<th class="r">차익</th><th class="r">마진</th></tr>`
+    + OPTS.map((o, i) => { const r = calc(i, k), dirty = S.prices[k][i] !== SAVED[k][i];
+      return `<tr><td><b>${o.o1}</b> <span class="weak">${o.o2}</span></td><td class="r num"><span data-tip="cost:${i}">${won(cost(o))}</span></td><td class="r"><input class="in ${dirty ? 'dirty' : ''}" data-price="${k}:${i}" value="${S.prices[k][i] ? wn(S.prices[k][i]) : ''}"></td>${k === 'naver' ? `<td>${addonText(plan.by[i], plan.count > 1)}</td>` : ''}<td class="r num"><b data-tip="sale:${k}:${i}">${r ? wn(r.profit) : '-'}</b></td><td class="r num"><span class="mini" style="display:inline"><span class="${r ? mgCls(r.margin) : ''}">${r ? r.margin.toFixed(1) + '%' : '-'}</span></span></td></tr>`; }).join('');
+  const avg = rs.length ? rs.reduce((s, r) => s + r.margin, 0) / rs.length : null;
+  document.getElementById('b-side').innerHTML = `
+    <div class="blk"><h5>${P.find((p) => p.key === k).label} 요약</h5>
+      <div class="kv"><span class="sub">평균 마진</span><b>${avg == null ? '-' : avg.toFixed(1) + '%'}</b></div>
+      <div class="kv"><span class="sub">최저 차익</span><b>${rs.length ? won(Math.min(...rs.map((r) => r.profit))) : '-'}</b></div>
+      <div class="kv"><span class="sub">손해 옵션</span><b>${rs.filter((r) => r.profit < 0).length}개</b></div>
+      ${k === 'naver' ? `<div class="kv"><span class="sub">네이버 상품 수</span><b>${plan.count}개</b></div>` : ''}</div>
+    <div class="blk"><h5>한 번에 맞추기 (이 판매처)</h5><div class="row">${bulkControls(true)}</div></div>
+    <div class="blk"><h5>수수료</h5><div class="row"><span class="sub" style="width:44px">판매</span><input class="in" style="width:70px" data-fee="${k}:p" value="${S.fee[k].p}"><span class="weak">%</span></div><div class="row"><span class="sub" style="width:44px">결제</span><input class="in" style="width:70px" data-fee="${k}:pay" value="${S.fee[k].pay}"><span class="weak">%</span></div></div>
+    <div class="blk" style="border-bottom:0"><div class="row" style="margin:0;flex-wrap:wrap">${saveControls()}</div></div>`;
+}
+
+function renderC() {
+  const plan = naverPlan(), i = S.sel, o = OPTS[i];
+  document.getElementById('c-bulk').innerHTML = `<span class="lbl">한 번에 맞추기</span>${bulkControls(false)}`;
+  document.getElementById('c-list').innerHTML = OPTS.map((x, j) => `<div class="c-opt ${j === i ? 'on' : ''}" data-sel="${j}"><div><b>${x.o1}</b> <span class="weak">${x.o2}</span><span class="mini">원가 ${won(cost(x))}</span></div>${P.map((p) => { const r = calc(j, p.key); return `<div class="p num"><span class="weak" style="font-size:11px">${p.label}</span><br><b>${wn(S.prices[p.key][j] || 0)}</b> <span class="mini" style="display:inline"><span class="${r ? mgCls(r.margin) : ''}">${r ? r.margin.toFixed(0) + '%' : ''}</span></span></div>`; }).join('')}</div>`).join('');
+  document.getElementById('c-calc').innerHTML = `<div class="mk" style="background:var(--color-bg-sub)"><b>${o.o1} · ${o.o2}</b><span class="mini">상품 ¥${o.cny} + 배송 ¥${o.ship} (${o.kg}kg) × ${FX} = ${won(cost(o))}</span></div>`
+    + P.map((p) => { const r = calc(i, p.key), dirty = S.prices[p.key][i] !== SAVED[p.key][i];
+      return `<div class="mk"><div class="mk-h"><b>${p.label}</b>${status(p.key)}<span class="sp"></span><input class="in ${dirty ? 'dirty' : ''}" data-price="${p.key}:${i}" value="${S.prices[p.key][i] ? wn(S.prices[p.key][i]) : ''}"><span class="weak">원</span></div>${r ? stack(r) : '<span class="weak">판매가를 넣어 주세요</span>'}${p.key === 'naver' && plan.by[i] ? `<div class="mini" style="margin-top:6px">${plan.count > 1 ? `상품 ${plan.by[i].no} · ` : ''}${plan.by[i].base ? '대표 옵션' : '추가금 ' + addonText(plan.by[i], false)}</div>` : ''}</div>`; }).join('');
+  document.getElementById('c-foot').innerHTML = `<span class="sp"></span>${saveControls()}`;
+}
+
+const renderAll = () => { renderHead(); renderA(); renderB(); renderC(); };
+
+// 입력·버튼
+const app = document.getElementById('app');
+app.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.dataset.price) { const [k, i] = t.dataset.price.split(':'); S.prices[k][+i] = Math.max(0, parseInt(t.value.replace(/[^0-9]/g, '')) || 0); }
+  else if (t.dataset.fee) { const [k, f] = t.dataset.fee.split(':'); S.fee[k][f] = parseFloat(t.value) || 0; }
+  else if (t.dataset.bulk) { S.bulk[t.dataset.bulk] = t.dataset.bulk === 'value' ? parseFloat(t.value) || 0 : t.value; }
+  else return;
+  renderAll();
+});
+app.addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.matches('input')) e.target.blur(); });
+app.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act],[data-tab],[data-sel]'); if (!t) return;
+  if (t.dataset.tab) S.tab = t.dataset.tab;
+  if (t.dataset.sel) S.sel = +t.dataset.sel;
+  if (t.dataset.act === 'apply') {
+    const cand = document.querySelector('.cand.on').id;
+    const keys = cand === 'cand-b' ? [S.tab] : S.bulk.target === 'all' ? ['coupang', 'naver'] : [S.bulk.target];
+    keys.forEach((k) => OPTS.forEach((o, i) => (S.prices[k][i] = target(o, k))));
+  }
+  if (t.dataset.act === 'revert') P.forEach((p) => (S.prices[p.key] = [...SAVED[p.key]]));
+  if (t.dataset.act === 'save') P.forEach((p) => (SAVED[p.key] = [...S.prices[p.key]]));
+  renderAll();
+});
+
+// 마우스 올리면 구성
+const tip = document.getElementById('tip');
+app.addEventListener('mouseover', (e) => {
+  const t = e.target.closest('[data-tip]'); if (!t) return;
+  const a = t.dataset.tip.split(':');
+  if (a[0] === 'cost') { const o = OPTS[+a[1]]; tip.innerHTML = `<h4>원가 ${won(cost(o))}</h4><div class="legend"><i style="background:color-mix(in srgb, var(--color-primary) 28%, var(--color-bg))"></i><span>상품 ¥${o.cny}</span><b>${won(o.cny * FX)}</b><i style="background:color-mix(in srgb, var(--color-primary) 55%, var(--color-bg))"></i><span>배송 ¥${o.ship} (${o.kg}kg)</span><b>${won(o.ship * FX)}</b></div>`; }
+  else { const r = calc(+a[2], a[1]); if (!r) return; tip.innerHTML = `<h4>${a[1] === 'coupang' ? '쿠팡' : '네이버'} ${won(r.sale)} 구성</h4>${stack(r)}`; }
+  const A = app.getBoundingClientRect(), R = t.getBoundingClientRect();
+  let left = Math.max(8, Math.min(R.left - A.left + R.width / 2 - 115, A.width - 238));
+  let top = R.bottom - A.top + 6; if (top + 160 > A.height) top = R.top - A.top - 166;
+  tip.style.left = left + 'px'; tip.style.top = top + 'px'; tip.classList.add('on');
+});
+app.addEventListener('mouseout', (e) => { if (e.target.closest('[data-tip]')) tip.classList.remove('on'); });
+
+// 후보 · 테마
+const note = document.getElementById('note');
+document.getElementById('pick').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.c) {
+    document.querySelectorAll('#pick [data-c]').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.cand').forEach((x) => x.classList.toggle('on', x.id === 'cand-' + b.dataset.c));
+    note.textContent = NOTES[b.dataset.c];
+  } else if (b.dataset.t !== undefined) {
+    document.querySelectorAll('#pick [data-t]').forEach((x) => x.classList.toggle('on', x === b));
+    if (b.dataset.t) app.setAttribute('data-theme', b.dataset.t); else app.removeAttribute('data-theme');
+  }
+});
+document.querySelector('#pick [data-t=""]').classList.add('on');
+note.textContent = NOTES.a;
+renderAll();
+</script>
+</body>
+</html>
