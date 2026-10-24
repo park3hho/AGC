@@ -790,3 +790,21 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - Request: `{"reg_no": "", "seller": "", "notice_title": "", "notice": [{"title": "", "body": ""}]}` (notice 최대 10)
 - **값이 바뀌면 승인된 상세페이지를 전부 검수 대기로 되돌린다.**
 - Response 200: `{"status": "success", "common": DetailCommon, "reset_count": 0}`
+
+### 주문 (`/orders`) — 2026-10-24
+마켓(네이버·쿠팡) 주문을 받아 저장하고, 새 주문·수취인 정보가 바뀐 주문은 **바로 통관부호를 검증**한다 (UNI-PASS API028). 권한 `order` (관리자·직원, API 키 불가). 수취인 전화·주소·통관부호와 마켓 원본 응답은 암호화 저장, 응답에는 가린 값만.
+
+**추적성** — 주문에 무엇이 일어나든 `OrderEvent` 한 줄: `actor_type`(system 폴링 · agent API 키 · user 로그인) · `via` · `kind`(collected · changed · pccc_check …) · `summary` · `data`(보낸 값·받은 값, 개인정보는 가림). 지우거나 고치지 않는다. 수집 1번은 `OrderSyncRun`(구간 · 받은/새/변경/검증 건수 · 성공 여부).
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/orders?stage=received&market=&pccc=&page=&size=` | 목록 + `pccc_counts` + 마켓별 `last_runs` + `poll_minutes` |
+| POST | `/orders/collect` | 지금 가져오기. body `{"markets": ["naver","coupang"], "since_hours": null}` — 비우면 지난 수집 끝 −10분부터(처음이면 3일). 409 = 이미 수집 중 |
+| GET | `/orders/sync-runs?market=&limit=` | 수집 기록 |
+| GET | `/orders/{id}` | `{"order": Order, "events": [OrderEvent]}` (최신 먼저) |
+| POST | `/orders/{id}/pccc-check` | 통관부호 다시 검증 (사람) → 위와 같은 응답 |
+
+- 마켓 → 줄: 네이버 = `productOrderId` 1개 (변경 상품 주문 조회 → 상세 조회), 쿠팡 = `shipmentBoxId` 안 옵션 1개 (발주서 목록, 상태 ACCEPT·INSTRUCT).
+- 검증 입력: 이름 = 수취인, 전화 = 쿠팡 `overseaShippingInfoDto.ordererPhoneNumber`(안심번호 아님) · 네이버 `shippingAddress.tel1`, 우편번호 = 수취인 5자리. 옛 6자리 우편번호·휴대폰 아님·일회용 부호(인증번호 없음)는 `missing`.
+- `pccc_status`: `ok` 일치 · `mismatch` 불일치(사유 `pccc_message`) · `missing` 자동 검증 못 함 · `error` 관세청 장애 · `pending`.
+- 자동 수집은 `ORDER_POLL_MINUTES`(기본 0 = 꺼짐).
