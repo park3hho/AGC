@@ -97,6 +97,65 @@ async function taobaoBlock(page) {
 **예방**:
 - 상품 상세는 주소로 바로 열지 않는다(访问异常 이 잘 뜬다). 검색창에 입력 → 결과 클릭으로 연다.
 - 동작 사이 간격은 5초 + 무작위, 클릭 위치·누르는 시간도 무작위.
+- 마우스·스크롤은 아래 헬퍼로만 움직인다 (2026-10-24 사용자 지정). `locator.click()` · `page.mouse.click()` · `mouse.wheel` 한 번에 크게 · `scrollIntoView` 를 타오바오에서 직접 쓰지 않는다.
+  - **휘어진 경로**: 현재 위치 → 목표를 직선이 아닌 베지어 곡선으로 (조절점을 경로 옆으로 거리의 10~30% 무작위로 띄움).
+  - **속도 변화**: 처음 빠르고 목표 근처에서 느려진다 (ease-out). 단계 수는 거리에 비례해 15~40.
+  - **지나쳤다 돌아오기**: 25% 확률로 목표를 3~8px 지나쳤다가 되돌아온다.
+  - **멈칫**: 누르기 직전 0.1~0.4초 머문다. 누르는 시간 40~160ms.
+  - **스크롤**: 한 번에 내리지 않고 80~240px 휠을 여러 번, 사이 0.08~0.35초. 가끔(15%) 조금 되올린다.
+
+```js
+const rnd = (a, b) => a + Math.random() * (b - a)
+let cur = { x: rnd(200, 600), y: rnd(150, 400) } // 마지막 마우스 위치
+
+async function humanMove(page, x, y) {
+  const path = async (tx, ty) => {
+    const dx = tx - cur.x, dy = ty - cur.y, dist = Math.hypot(dx, dy) || 1
+    const off = dist * rnd(0.1, 0.3) * (Math.random() < 0.5 ? -1 : 1)
+    const cx = cur.x + dx * rnd(0.3, 0.7) - (dy / dist) * off   // 경로 옆으로 띄운 조절점
+    const cy = cur.y + dy * rnd(0.3, 0.7) + (dx / dist) * off
+    const n = Math.round(Math.min(40, Math.max(15, dist / 15)))
+    for (let i = 1; i <= n; i++) {
+      const t = 1 - Math.pow(1 - i / n, 3)                           // ease-out
+      const px = (1 - t) ** 2 * cur.x + 2 * (1 - t) * t * cx + t * t * tx
+      const py = (1 - t) ** 2 * cur.y + 2 * (1 - t) * t * cy + t * t * ty
+      await page.mouse.move(px, py)
+      await sleep(rnd(6, 18))
+    }
+    cur = { x: tx, y: ty }
+  }
+  if (Math.random() < 0.25) {                                         // 지나쳤다 돌아오기
+    const a = rnd(0, Math.PI * 2), d = rnd(3, 8)
+    await path(x + Math.cos(a) * d, y + Math.sin(a) * d)
+    await sleep(rnd(60, 180))
+  }
+  await path(x, y)
+}
+
+async function humanScroll(page, total) {                            // total: 내릴 px (음수면 올림)
+  let done = 0
+  while (Math.abs(done) < Math.abs(total)) {
+    const step = Math.sign(total) * Math.min(Math.abs(total) - Math.abs(done), rnd(80, 240))
+    await page.mouse.wheel(0, step); done += step
+    await sleep(rnd(80, 350))
+    if (Math.random() < 0.15) { await page.mouse.wheel(0, -step * rnd(0.2, 0.5)); await sleep(rnd(120, 300)) }
+  }
+}
+
+async function humanClick(page, locator) {
+  let box = await locator.boundingBox()
+  const vh = page.viewportSize()?.height ?? 800
+  if (box && (box.y < 60 || box.y + box.height > vh - 60)) {          // 화면 밖이면 나눠서 스크롤
+    await humanScroll(page, box.y - vh * rnd(0.3, 0.5))
+    box = await locator.boundingBox()
+  }
+  if (!box) throw new Error('클릭할 요소가 안 보임')
+  const x = box.x + box.width * rnd(0.25, 0.75), y = box.y + box.height * rnd(0.3, 0.7)
+  await humanMove(page, x, y)
+  await sleep(rnd(100, 400))                                          // 멈칫
+  await page.mouse.down(); await sleep(rnd(40, 160)); await page.mouse.up()
+}
+```
 - 타오바오 탭은 한 번에 하나만. 서브 에이전트로 동시에 여러 타오바오 페이지를 열지 않는다 (같은 로그인 계정).
 - 다 본 상품 탭은 닫고 다음으로 간다.
 
