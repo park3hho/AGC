@@ -659,12 +659,12 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 }
 ```
 - 계산 규칙 (BE `core/shipping_config.py`, 2026-10-20 타오바오 집운-해운 식품 요금표 확인)
-  - `volume_ml` = 옵션1 + 옵션2 이름에서 읽은 총 용량 (`245ml×24팩` → 5880, `1L×6팩` → 6000, 개수 없으면 1개)
+  - `volume_ml` = 옵션1 + 옵션2 이름에서 읽은 총 용량 (`245ml×24팩` → 5880, `1L×6팩` → 6000, 개수 없으면 1개). g·kg 로 적힌 옵션은 1g = 1ml 로 본다 (`205g×10팩` → 2050, 2026-10-24)
   - `weight_g` = `volume_ml` × 1g + 박스 500g
   - `billable_kg` = 1kg 미만은 1kg, 넘는 무게는 0.5kg 단위 올림
   - `shipping_cny` = 33 + (`billable_kg` − 1) ÷ 0.5 × 2 (위안)
   - `over_limit` = `billable_kg` 가 30kg 초과 (소형 한도 — 이 요금표로 못 보냄)
-- 용량을 못 읽으면 `volume_ml` · `weight_g` · `billable_kg` · `shipping_cny` 가 `null` → 옵션 이름에 `245ml×24` 처럼 적어야 계산된다.
+- 용량을 못 읽으면 `volume_ml` · `weight_g` · `billable_kg` · `shipping_cny` 가 `null` → 옵션 이름에 `245ml×24` 나 `205g×10` 처럼 적어야 계산된다.
 - 부피 무게 · 관세는 반영하지 않는다.
 ---
 
