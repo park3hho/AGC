@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>상품 상세 목업 — 후보 A · B · C</title>
+<style>
+  /* 바깥(후보 고르기)은 Aside 테마 변수, 안쪽 화면은 AGC 앱 색 (Toss-Flat) */
+  .pick { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+  .pick button { height: 32px; padding: 0 12px; border: 1px solid var(--border, #e5e8eb); border-radius: 8px; background: transparent; color: var(--muted-foreground, #4e5968); font: inherit; font-size: 13px; cursor: pointer; }
+  .pick button.on { border-color: var(--foreground, #191f28); color: var(--foreground, #191f28); font-weight: 600; }
+  .pick-note { margin: -4px 0 12px; color: var(--muted-foreground, #8b95a1); font-size: 12px; }
+
+  .app {
+    --p: #3182f6; --p-bg: #e8f3ff; --tx: #191f28; --sub: #4e5968; --weak: #8b95a1;
+    --line: #e5e8eb; --bg: #fff; --bg-app: #f7f8fa; --ok: #0a7a3e; --ok-bg: #e5f8ee; --warn: #a35c00;
+    --c-goods: #b0c4de; --c-ship: #7fa7d9; --c-fee: #d5d9de; --c-profit: #3182f6;
+    position: relative; height: 600px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px;
+    background: var(--bg-app); color: var(--tx); font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 13px;
+  }
+  .app * { box-sizing: border-box; }
+  .app button { font: inherit; color: inherit; cursor: pointer; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--weak); }
+  .panel { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+  .cand { display: none; height: 100%; padding: 14px; flex-direction: column; gap: 10px; }
+  .cand.on { display: flex; }
+
+  /* 공통 머리 */
+  .hd { display: flex; align-items: center; gap: 10px; }
+  .back { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--sub); }
+  .thumb { width: 40px; height: 40px; border-radius: 8px; object-fit: cover; background: var(--bg); border: 1px solid var(--line); }
+  .hd h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+  .hd .code { color: var(--weak); font-size: 12px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; background: var(--bg); border: 1px solid var(--line); color: var(--sub); font-size: 12px; white-space: nowrap; }
+  .chip.ok { border-color: transparent; background: var(--ok-bg); color: var(--ok); font-weight: 600; }
+  .chip.link { color: var(--p); border-color: transparent; background: var(--p-bg); font-weight: 600; text-decoration: none; }
+  .chip.off { color: var(--weak); background: transparent; }
+  .sp { flex: 1; }
+  .btn { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--sub); font-size: 12px; font-weight: 600; }
+
+  /* 원가·판매가 구성 막대 (오버레이·펼침에서 공통) */
+  .stack { display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: var(--bg-app); }
+  .stack i { display: block; height: 100%; }
+  .legend { display: grid; grid-template-columns: auto 1fr auto; gap: 3px 8px; margin-top: 8px; font-size: 12px; }
+  .legend .dot { width: 8px; height: 8px; border-radius: 2px; margin-top: 4px; }
+  .legend b { font-weight: 600; text-align: right; }
+
+  /* 마우스 올리면 뜨는 오버레이 */
+  .tip { position: absolute; z-index: 30; width: 240px; padding: 12px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.12); pointer-events: none; opacity: 0; transition: opacity .12s; }
+  .tip.on { opacity: 1; }
+  .tip h4 { margin: 0 0 8px; font-size: 12px; color: var(--sub); font-weight: 600; }
+  [data-tip] { cursor: help; border-bottom: 1px dashed transparent; }
+  [data-tip]:hover { border-bottom-color: var(--weak); }
+
+  /* ── A: 요약 숫자 + 탭 ─────────────────────────── */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .kpi { padding: 10px 12px; }
+  .kpi small { display: block; color: var(--weak); font-size: 11px; }
+  .kpi b { display: block; margin-top: 2px; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .tabs { display: flex; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+  .tabs button { height: 38px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--weak); font-weight: 600; }
+  .tabs button.on { color: var(--tx); border-bottom-color: var(--tx); }
+  .tabbody { flex: 1; min-height: 0; overflow: auto; }
+  .pane { display: none; } .pane.on { display: block; }
+  table.t { width: 100%; border-collapse: collapse; }
+  table.t th { padding: 8px 14px; color: var(--weak); font-size: 11px; font-weight: 600; text-align: left; border-bottom: 1px solid var(--line); }
+  table.t td { padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  table.t tr:last-child td { border-bottom: 0; }
+  table.t .r { text-align: right; }
+  .price { font-size: 14px; font-weight: 700; }
+  .mg { display: block; font-size: 11px; color: var(--weak); }
+  .mg.good { color: var(--ok); }
+
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); padding: 16px 14px 8px; position: relative; }
+  .steps::before { content: ''; position: absolute; left: 12.5%; right: 12.5%; top: 23px; height: 2px; background: var(--line); }
+  .st { position: relative; text-align: center; }
+  .st i { display: block; width: 16px; height: 16px; margin: 0 auto 6px; border-radius: 50%; background: var(--p); border: 3px solid var(--p-bg); }
+  .st b { display: block; font-size: 13px; }
+  .st span { color: var(--weak); font-size: 11px; }
+  .gaps { display: grid; grid-template-columns: 1fr 2fr 2fr 2fr 1fr; padding: 0 14px 14px; color: var(--p); font-size: 11px; font-weight: 600; text-align: center; }
+
+  .mlist { padding: 4px 0; }
+  .mrow { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+  .mrow:last-child { border-bottom: 0; }
+  .mrow a { color: var(--tx); text-decoration: none; font-weight: 600; }
+  .mrow a:hover { color: var(--p); }
+
+  .imgs { display: flex; flex-direction: column; }
+  .imgs img { display: block; width: 100%; }
+
+  /* ── B: 옵션 카드 + 오른쪽 상세설명 ───────────────── */
+  .b-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 10px; }
+  .b-left { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .flow { display: flex; align-items: center; gap: 0; padding: 10px 14px; font-size: 12px; }
+  .flow .n { display: flex; flex-direction: column; align-items: center; min-width: 52px; }
+  .flow .n i { width: 10px; height: 10px; border-radius: 50%; background: var(--p); margin-bottom: 3px; }
+  .flow .n.off i { background: var(--line); }
+  .flow .n span { color: var(--sub); font-weight: 600; }
+  .flow .e { flex: 1; white-space: nowrap; text-align: center; color: var(--weak); font-size: 11px; position: relative; top: -7px; border-bottom: 2px solid var(--line); margin: 0 2px; padding-bottom: 2px; }
+  .flow .e.hot { color: var(--p); border-bottom-color: var(--p-bg); font-weight: 600; }
+  .cards { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min-content; gap: 8px; overflow: auto; }
+  .card { display: block; width: 100%; padding: 12px; text-align: left; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); color: var(--tx); }
+  .card:hover { border-color: var(--p); }
+  .card .on1 { font-weight: 700; }
+  .card .cost { margin-top: 2px; color: var(--weak); font-size: 12px; }
+  .card .mk { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--sub); }
+  .card .mk b { color: var(--tx); font-size: 14px; }
+  .b-right { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .b-right .bar { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .seg { display: inline-flex; padding: 2px; border-radius: 8px; background: var(--bg-app); }
+  .seg button { height: 22px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--weak); font-size: 11px; font-weight: 600; }
+  .seg button.on { background: var(--bg); color: var(--tx); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .b-right .scroll { flex: 1; overflow: auto; }
+
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 20; width: 300px; padding: 16px; background: var(--bg); border-left: 1px solid var(--line); box-shadow: -8px 0 24px rgba(0,0,0,.08); transform: translateX(105%); transition: transform .18s ease-out; overflow: auto; }
+  .drawer.on { transform: none; }
+  .drawer h3 { margin: 0; font-size: 15px; }
+  .drawer .blk { margin-top: 16px; }
+  .drawer .blk h5 { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 13px; }
+  .x { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border: 0; border-radius: 6px; background: var(--bg-app); color: var(--sub); }
+
+  .pop { position: absolute; z-index: 25; width: 300px; padding: 6px 0; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); box-shadow: 0 6px 24px rgba(0,0,0,.12); display: none; }
+  .pop.on { display: block; }
+
+  /* ── C: 한 줄 요약 + 펼치기 ───────────────────────── */
+  .c-sum { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; padding: 12px 14px; }
+  .c-sum div small { display: block; color: var(--weak); font-size: 11px; }
+  .c-sum div b { font-size: 16px; letter-spacing: -0.02em; }
+  .tl { padding: 10px 14px 12px; }
+  .tl .lbl { display: flex; justify-content: space-between; color: var(--weak); font-size: 11px; margin-bottom: 6px; }
+  .tlbar { display: flex; height: 18px; border-radius: 5px; overflow: hidden; gap: 2px; }
+  .tlbar i { display: block; height: 100%; min-width: 6px; cursor: help; }
+  .tlkey { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; font-size: 11px; color: var(--sub); }
+  .tlkey span::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 4px; background: var(--k); }
+  .acc { flex: 1; min-height: 0; overflow: auto; }
+  .arow { display: grid; grid-template-columns: minmax(0, 1.4fr) 90px 1fr 1fr 18px; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .arow:hover { background: var(--bg-app); }
+  .arow.head { cursor: default; padding: 8px 14px; color: var(--weak); font-size: 11px; font-weight: 600; }
+  .arow.head:hover { background: none; }
+  .arow .chev { color: var(--weak); transition: transform .15s; }
+  .arow.open .chev { transform: rotate(90deg); }
+  .mbar { display: flex; align-items: center; gap: 6px; }
+  .mbar .track { flex: 1; height: 4px; border-radius: 2px; background: var(--bg-app); overflow: hidden; }
+  .mbar .track i { display: block; height: 100%; background: var(--p); }
+  .aexp { display: none; grid-template-columns: 1fr 1fr; gap: 16px; padding: 12px 14px 14px; background: var(--bg-app); border-bottom: 1px solid var(--line); }
+  .aexp.on { display: grid; }
+  .aexp h5 { display: flex; justify-content: space-between; margin: 0 0 6px; font-size: 12px; }
+  .c-foot { display: flex; gap: 6px; align-items: center; }
+  .modal { position: absolute; inset: 0; z-index: 40; display: none; place-items: center; background: rgba(25,31,40,.45); }
+  .modal.on { display: grid; }
+  .modal .box { width: 320px; height: 92%; display: flex; flex-direction: column; background: var(--bg); border-radius: 12px; overflow: hidden; }
+  .modal .box .bar { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 1px solid var(--line); font-weight: 700; }
+  .modal .box .scroll { flex: 1; overflow: auto; }
+</style>
+</head>
+<body>
+<div class="pick" id="pick">
+  <button data-c="a" class="on">A · 요약 숫자 + 탭</button>
+  <button data-c="b">B · 옵션 카드 + 상세설명 옆</button>
+  <button data-c="c">C · 한 줄 요약 + 펼치기</button>
+</div>
+<p class="pick-note" id="note"></p>
+
+<div class="app" id="app">
+  <!-- A -->
+  <section class="cand on" id="cand-a">
+    <div class="hd" data-hd></div>
+    <div class="kpis">
+      <div class="panel kpi"><small>쿠팡 판매가</small><b class="num">18,400~42,000원</b></div>
+      <div class="panel kpi"><small>차익 (지금 환율)</small><b class="num">3,132~4,097원</b></div>
+      <div class="panel kpi"><small>마진</small><b class="num">9.8~17.0%</b></div>
+      <div class="panel kpi"><small>제품 추가 → 업로드</small><b class="num">4일 17시간</b></div>
+    </div>
+    <div class="panel" style="flex:1;min-height:0;display:flex;flex-direction:column">
+      <div class="tabs" id="a-tabs">
+        <button class="on" data-p="price">가격</button><button data-p="flow">진행</button><button data-p="market">마켓 3</button><button data-p="detail">상세설명</button>
+      </div>
+      <div class="tabbody">
+        <div class="pane on" data-pane="price"><table class="t" id="a-price"></table></div>
+        <div class="pane" data-pane="flow">
+          <div class="steps">
+            <div class="st"><i></i><b>리서치</b><span>10-20 00:43</span></div>
+            <div class="st"><i></i><b>가격 책정</b><span>10-20 02:57</span></div>
+            <div class="st"><i></i><b>디자인 승인</b><span>10-24 17:56</span></div>
+            <div class="st"><i></i><b>쿠팡 업로드</b><span>10-24 18:05</span></div>
+          </div>
+          <div class="gaps"><span></span><span>2시간 14분</span><span>4일 15시간 (디자인 5시간 2분)</span><span>9분</span><span></span></div>
+          <p class="muted" style="margin:0 14px 14px;font-size:12px">조사 1회 · 마지막 조사 4일 전 · 네이버는 아직 안 올림</p>
+        </div>
+        <div class="pane" data-pane="market"><div class="mlist" data-mlist></div></div>
+        <div class="pane" data-pane="detail"><div class="imgs" data-imgs style="max-width:360px;margin:0 auto"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="cand" id="cand-b">
+    <div class="hd" data-hd></div>
+    <div class="b-grid">
+      <div class="b-left">
+        <div class="panel flow" id="b-flow"></div>
+        <div class="cards" id="b-cards"></div>
+      </div>
+      <div class="panel b-right">
+        <div class="bar">상세설명<span class="sp"></span><span class="seg"><button class="on">쿠팡</button><button>네이버</button></span></div>
+        <div class="scroll"><div class="imgs" data-imgs></div></div>
+      </div>
+    </div>
+    <aside class="drawer" id="b-drawer"></aside>
+  </section>
+
+  <!-- C -->
+  <section class="cand" id="cand-c">
+    <div class="hd" data-hd></div>
+    <div class="panel">
+      <div class="c-sum">
+        <div><small>판매 중</small><b>쿠팡 3개</b> <span class="muted">· 네이버 없음</span></div>
+        <div><small>마진</small><b class="num">9.8~17.0%</b></div>
+        <div><small>제품 추가 → 업로드</small><b class="num">4일 17시간</b></div>
+      </div>
+      <div class="tl" style="border-top:1px solid var(--line)">
+        <div class="lbl"><span>10-20 00:43 제품 추가</span><span>10-24 18:05 쿠팡 업로드</span></div>
+        <div class="tlbar" id="c-tl"></div>
+        <div class="tlkey" id="c-tlkey"></div>
+      </div>
+    </div>
+    <div class="panel acc" id="c-acc"></div>
+    <div class="c-foot">
+      <span class="muted" style="font-size:12px">줄을 누르면 가격 구성이 펼쳐져요</span><span class="sp"></span>
+      <button class="btn" id="c-mk">마켓 3 ▾</button>
+      <button class="btn" id="c-img">상세설명 보기</button>
+    </div>
+    <div class="modal" id="c-modal"><div class="box"><div class="bar">상세설명 · 쿠팡 v2<span class="sp"></span><button class="btn" id="c-close">닫기</button></div><div class="scroll"><div class="imgs" data-imgs></div></div></div></div>
+  </section>
+
+  <div class="tip" id="tip"></div>
+  <div class="pop" id="pop"></div>
+</div>
+
+<script>
+const FX = 198.83;
+const FILES = 'https://agc-fe.vercel.app/api/files';
+const PHOTO = FILES + '/photos/2026/10/80018ffd91bd416b95ddfbf502ae44c2.jpg';
+const IMGS = [1, 2, 3].map((n) => `${FILES}/detail/PR-261020-0007/v2/PR-261020-0007_coupang_0${n}.jpg`);
+const FEE = { coupang: 11.66, naver: 6.63 };
+const OPTS = [
+  { name: '귤맛', size: '6캔', goods: 27, ship: 39, coupang: 18400, naver: 17400, link: true },
+  { name: '오렌지맛', size: '6캔', goods: 27, ship: 39, coupang: 18400, naver: 17400, link: true },
+  { name: '귤+오렌지 혼합', size: '12캔', goods: 54, ship: 47, coupang: 26300, naver: 24900, link: true },
+  { name: '귤+오렌지 혼합', size: '24캔', goods: 103, ship: 63, coupang: 42000, naver: 38800, link: true },
+];
+const MARKETS = [
+  { title: '귤맛 330ml x 6캔', at: '10-24 18:05', price: '18,400원' },
+  { title: '귤+오렌지 혼합 12캔 / 24캔', at: '10-24 18:11', price: '26,300 / 42,000원' },
+  { title: '오렌지맛 330ml x 6캔', at: '10-24 18:11', price: '18,400원' },
+];
+const NOTES = {
+  a: '첫 화면은 숫자 4개 + 가격표(총액만). 진행·마켓·상세설명은 탭. 원가·판매가에 마우스를 올리면 구성이 떠요.',
+  b: '옵션마다 카드 하나(원가 총액 + 마켓별 판매가·마진). 카드를 누르면 오른쪽 서랍에 구성. 상세설명은 늘 옆에 보임.',
+  c: '요약 한 줄 + 시간 막대(어디서 오래 걸렸는지). 옵션 줄을 누르면 그 자리에서 구성 막대가 펼쳐짐. 마켓·상세설명은 버튼.',
+};
+
+const won = (n) => Math.round(n).toLocaleString('ko-KR') + '원';
+const calc = (o, mk) => {
+  const g = o.goods * FX, s = o.ship * FX, sale = o[mk], fee = sale * FEE[mk] / 100;
+  const profit = sale - g - s - fee;
+  return { g, s, fee, profit, sale, cost: g + s, margin: profit / sale * 100 };
+};
+const label = (o) => `${o.name} · ${o.size}`;
+const stack = (r) => {
+  const parts = [['상품', r.g, 'var(--c-goods)'], ['배송', r.s, 'var(--c-ship)'], ['수수료', r.fee, 'var(--c-fee)'], ['차익', r.profit, 'var(--c-profit)']];
+  return `<div class="stack">${parts.map(([, v, c]) => `<i style="width:${v / r.sale * 100}%;background:${c}"></i>`).join('')}</div>
+    <div class="legend">${parts.map(([k, v, c]) => `<i class="dot" style="background:${c}"></i><span>${k}</span><b class="num">${won(v)}</b>`).join('')}</div>`;
+};
+const costTip = (o) => `<h4>원가 ${won((o.goods + o.ship) * FX)} 구성</h4>
+  <div class="legend"><i class="dot" style="background:var(--c-goods)"></i><span>상품 ¥${o.goods}</span><b class="num">${won(o.goods * FX)}</b>
+  <i class="dot" style="background:var(--c-ship)"></i><span>배송 ¥${o.ship}</span><b class="num">${won(o.ship * FX)}</b></div>
+  <p class="muted" style="margin:8px 0 0;font-size:11px">¥${o.goods + o.ship} × ${FX}원 (오늘 환율)</p>`;
+const saleTip = (o, mk) => `<h4>${mk === 'coupang' ? '쿠팡' : '네이버'} ${won(o[mk])} 구성</h4>${stack(calc(o, mk))}`;
+
+// 공통 머리 · 마켓 목록 · 상세 이미지
+document.querySelectorAll('[data-hd]').forEach((el) => {
+  el.innerHTML = `<button class="back">←</button><img class="thumb" src="${PHOTO}" alt="">
+    <div><h1>북빙양 귤맛 탄산음료 (캔)</h1><div class="code">PR-261020-0007 · 北冰洋 桔汁汽水</div></div>
+    <span class="sp"></span><span class="chip ok">디자인 승인</span>
+    <a class="chip link" href="https://detail.tmall.com/item.htm?id=665855083188">타오바오 ↗</a>`;
+});
+const mlist = MARKETS.map((m) => `<div class="mrow"><span class="chip">쿠팡</span><a href="https://www.coupang.com/vp/products/9790651423">${m.title} ↗</a><span class="sp"></span><span class="muted num">${m.price}</span><span class="muted num">${m.at}</span></div>`).join('')
+  + `<div class="mrow"><span class="chip off">네이버</span><span class="muted">아직 안 올림 · 판매 권한 심사 중</span></div>`;
+document.querySelectorAll('[data-mlist]').forEach((el) => (el.innerHTML = mlist));
+document.querySelectorAll('[data-imgs]').forEach((el) => (el.innerHTML = IMGS.map((u) => `<img src="${u}" alt="" loading="lazy">`).join('')));
+
+// A — 가격표 (총액만, 올리면 구성)
+document.getElementById('a-price').innerHTML = `<tr><th>옵션</th><th class="r">원가</th><th class="r">쿠팡</th><th class="r">네이버</th><th></th></tr>`
+  + OPTS.map((o, i) => {
+    const c = calc(o, 'coupang'), n = calc(o, 'naver');
+    return `<tr><td><b>${o.name}</b> <span class="muted">${o.size}</span></td>
+      <td class="r num"><span data-tip="cost:${i}">${won(c.cost)}</span></td>
+      <td class="r num"><span class="price" data-tip="coupang:${i}">${won(o.coupang)}</span><span class="mg ${c.margin >= 15 ? 'good' : ''}">${c.margin.toFixed(1)}%</span></td>
+      <td class="r num"><span class="price" data-tip="naver:${i}">${won(o.naver)}</span><span class="mg ${n.margin >= 15 ? 'good' : ''}">${n.margin.toFixed(1)}%</span></td>
+      <td class="r"><a class="chip link" href="#">쿠팡 ↗</a></td></tr>`;
+  }).join('');
+document.getElementById('a-tabs').addEventListener('click', (e) => {
+  const p = e.target.dataset.p; if (!p) return;
+  document.querySelectorAll('#a-tabs button').forEach((b) => b.classList.toggle('on', b === e.target));
+  document.querySelectorAll('#cand-a .pane').forEach((x) => x.classList.toggle('on', x.dataset.pane === p));
+});
+
+// B — 진행 흐름 · 옵션 카드 · 서랍
+document.getElementById('b-flow').innerHTML = [
+  ['리서치', '10-20 00:43'], '2시간', ['가격', '10-20 02:57'], '4일 10시간', ['디자인', '10-24 12:51'], '5시간', ['승인', '10-24 17:56'], '9분', ['쿠팡', '10-24 18:05'],
+].map((x) => typeof x === 'string'
+  ? `<span class="e ${x.includes('일') ? 'hot' : ''}">${x}</span>`
+  : `<span class="n" data-tip="t:${x[0]} ${x[1]}"><i></i><span>${x[0]}</span></span>`).join('');
+document.getElementById('b-cards').innerHTML = OPTS.map((o, i) => {
+  const c = calc(o, 'coupang'), n = calc(o, 'naver');
+  return `<button class="card" data-card="${i}"><div class="on1">${o.name} <span class="muted" style="font-weight:400">${o.size}</span></div>
+    <div class="cost num">원가 ${won(c.cost)}</div>
+    <div class="mk"><span>쿠팡</span><span class="num"><b>${won(o.coupang)}</b> · ${c.margin.toFixed(0)}%</span></div>
+    <div class="mk"><span>네이버</span><span class="num"><b>${won(o.naver)}</b> · ${n.margin.toFixed(0)}%</span></div></button>`;
+}).join('');
+const drawer = document.getElementById('b-drawer');
+document.getElementById('b-cards').addEventListener('click', (e) => {
+  const card = e.target.closest('[data-card]'); if (!card) return;
+  const o = OPTS[card.dataset.card];
+  drawer.innerHTML = `<button class="x" data-x>✕</button><h3>${label(o)}</h3><p class="muted" style="margin:4px 0 0;font-size:12px">오늘 환율 ${FX}원 · 저장한 판매가 기준</p>
+    <div class="blk"><h5><span>원가</span><span class="num">${won((o.goods + o.ship) * FX)}</span></h5>${costTip(o).replace(/<h4>.*?<\/h4>/, '')}</div>
+    <div class="blk"><h5><span>쿠팡</span><span class="num">${won(o.coupang)}</span></h5>${stack(calc(o, 'coupang'))}</div>
+    <div class="blk"><h5><span>네이버</span><span class="num">${won(o.naver)}</span></h5>${stack(calc(o, 'naver'))}</div>
+    <div class="blk"><a class="chip link" href="#">쿠팡 상품 페이지 ↗</a></div>`;
+  drawer.classList.add('on');
+});
+drawer.addEventListener('click', (e) => { if (e.target.dataset.x !== undefined) drawer.classList.remove('on'); });
+
+// C — 시간 막대 · 아코디언 · 버튼
+const TL = [
+  ['리서치→가격', 134, '#7fa7d9', '10-20 00:43 → 02:57 · 2시간 14분'],
+  ['디자인 대기', 6234, '#d5d9de', '10-20 02:57 → 10-24 12:51 · 4일 9시간 54분'],
+  ['디자인', 302, '#3182f6', '10-24 12:51 → 17:56 · 5시간 2분'],
+  ['업로드', 9, '#0a7a3e', '10-24 17:56 → 18:05 · 9분'],
+];
+const tlTotal = TL.reduce((s, x) => s + x[1], 0);
+document.getElementById('c-tl').innerHTML = TL.map((x, i) => `<i data-tip="tl:${i}" style="width:${x[1] / tlTotal * 100}%;background:${x[2]}"></i>`).join('');
+document.getElementById('c-tlkey').innerHTML = TL.map((x) => `<span style="--k:${x[2]}">${x[0]} ${x[3].split(' · ')[1]}</span>`).join('');
+const acc = document.getElementById('c-acc');
+acc.innerHTML = `<div class="arow head"><span>옵션</span><span style="text-align:right">원가</span><span>쿠팡</span><span>네이버</span><span></span></div>`
+  + OPTS.map((o, i) => {
+    const c = calc(o, 'coupang'), n = calc(o, 'naver');
+    const cell = (r, mk) => `<div><b class="num">${won(o[mk])}</b><div class="mbar"><span class="track"><i style="width:${Math.max(0, r.margin) * 4}%"></i></span><span class="muted num" style="font-size:11px">${r.margin.toFixed(1)}%</span></div></div>`;
+    return `<div class="arow" data-row="${i}"><span><b>${o.name}</b> <span class="muted">${o.size}</span></span><span class="num" style="text-align:right">${won(c.cost)}</span>${cell(c, 'coupang')}${cell(n, 'naver')}<span class="chev">›</span></div>
+      <div class="aexp" data-exp="${i}"><div><h5><span>쿠팡</span><span class="num">${won(o.coupang)}</span></h5>${stack(c)}</div><div><h5><span>네이버</span><span class="num">${won(o.naver)}</span></h5>${stack(n)}</div></div>`;
+  }).join('');
+acc.addEventListener('click', (e) => {
+  const row = e.target.closest('[data-row]'); if (!row) return;
+  const exp = acc.querySelector(`[data-exp="${row.dataset.row}"]`);
+  row.classList.toggle('open'); exp.classList.toggle('on');
+});
+const pop = document.getElementById('pop');
+document.getElementById('c-mk').addEventListener('click', (e) => {
+  const app = document.getElementById('app').getBoundingClientRect(), b = e.target.getBoundingClientRect();
+  pop.innerHTML = mlist; pop.style.right = (app.right - b.right) + 'px'; pop.style.bottom = (app.bottom - b.top + 6) + 'px';
+  pop.classList.toggle('on');
+});
+document.getElementById('c-img').addEventListener('click', () => document.getElementById('c-modal').classList.add('on'));
+document.getElementById('c-close').addEventListener('click', () => document.getElementById('c-modal').classList.remove('on'));
+
+// 오버레이 (마우스 올림)
+const tip = document.getElementById('tip'), appEl = document.getElementById('app');
+appEl.addEventListener('mouseover', (e) => {
+  const t = e.target.closest('[data-tip]'); if (!t) return;
+  const [k, v] = t.dataset.tip.split(':');
+  let html = '';
+  if (k === 'cost') html = costTip(OPTS[v]);
+  else if (k === 'coupang' || k === 'naver') html = saleTip(OPTS[v], k);
+  else if (k === 'tl') html = `<h4>${TL[v][0]}</h4><div class="num">${TL[v][3]}</div>`;
+  else if (k === 't') html = `<div class="num">${t.dataset.tip.slice(2)}</div>`;
+  tip.innerHTML = html;
+  const a = appEl.getBoundingClientRect(), r = t.getBoundingClientRect();
+  let left = r.left - a.left + r.width / 2 - 120; left = Math.max(8, Math.min(left, a.width - 248));
+  let top = r.bottom - a.top + 8; if (top + 170 > a.height) top = r.top - a.top - 8 - tip.offsetHeight;
+  tip.style.left = left + 'px'; tip.style.top = top + 'px'; tip.classList.add('on');
+});
+appEl.addEventListener('mouseout', (e) => { if (e.target.closest('[data-tip]')) tip.classList.remove('on'); });
+
+// 후보 고르기
+const note = document.getElementById('note');
+const show = (c) => {
+  document.querySelectorAll('#pick button').forEach((b) => b.classList.toggle('on', b.dataset.c === c));
+  document.querySelectorAll('.cand').forEach((x) => x.classList.toggle('on', x.id === 'cand-' + c));
+  note.textContent = NOTES[c]; pop.classList.remove('on'); drawer.classList.remove('on');
+};
+document.getElementById('pick').addEventListener('click', (e) => e.target.dataset.c && show(e.target.dataset.c));
+show('a');
+</script>
+</body>
+</html>
