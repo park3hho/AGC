@@ -481,7 +481,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 
 | Method | Path | 설명 |
 |---|---|---|
-| GET | `/shipping-addresses` | 목록 (기본 출고지 → 기본 반품지 → 나머지). `{"items": [ShippingAddress]}` |
+| GET | `/shipping-addresses` | 목록 (기본 출고지 → 기본 반품지 → 나머지). `{"items": [ShippingAddress], "couriers": [Courier]}` |
 | POST | `/shipping-addresses` | 추가. `{"address": ShippingAddress}` |
 | GET | `/shipping-addresses/{id}` | 한 건 · 404 |
 | PATCH | `/shipping-addresses/{id}` | 수정 — 보낸 필드만. 합친 결과를 다시 검사 (422). 400 바꿀 것 없음 · 404 |
@@ -494,9 +494,15 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   "zip_code": "264205", "address": "山东省 威海市 …", "address_detail": "韩国海运集运", "phone": "+86…",
   "uses": ["outbound"], "defaults": ["outbound"],
   "market_codes": [{"market": "쿠팡", "use": "outbound", "code": "25556899", "name": "타오바오 공식 해운 집운 웨이하이"}],
+  "route": {
+    "forwarder": "차이냐오(菜鸟)", "transport": "sea", "port": null, "courier": "CJGLS",
+    "tracking_when": "웨이하이 출고·선적 후", "customs_ref": "H B/L — 집운 物流 상세", "confirmed": false, "note": null,
+    "transport_label": "해운", "courier_name": "CJ대한통운", "courier_codes": {"쿠팡": "CJGLS", "네이버": "CJGLS"}
+  },
   "memo": null, "created_at": "...", "updated_at": "..."
 }
 ```
+**Courier** `{"key": "LOTTE", "name": "롯데택배", "codes": {"쿠팡": "HYUNDAI", "네이버": "HYUNDAI"}}` — BE `core/shipping_config.COURIERS` 가 원천.
 | 필드 | 필수 | 규칙 |
 |---|---|---|
 | `name` · `address` | ✅ | 100자 · 300자 |
@@ -505,6 +511,20 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | `defaults` | | `uses` 의 부분집합. **용도마다 기본은 1곳** — 저장하면 다른 주소의 같은 기본값이 풀린다 |
 | `market_codes` | | 최대 20개. `market` 자유 입력, `use` 는 `uses` 안에서, 같은 `market`+`use` 중복 불가 |
 | `zip_code` · `address_detail` · `phone` · `memo` | | 비우면 `null` |
+| `route` | | 배송 경로 (해외 출고지 → 해운/항공 → 통관 → 국내 택배). `null` = 없음/지움. 아래 표 |
+
+**route** (2026-10-24) — 마켓 발송처리(송장 업로드)는 **국내 택배사 + 국내 송장번호**. 주문 발송처리는 `route.courier_codes[마켓]` 을 택배사 코드로 쓴다.
+| 필드 | 규칙 |
+|---|---|
+| `forwarder` | 국제 물류사 (집운 업체) 100자 |
+| `transport` | `sea`(해운, 기본) · `air`(항공) |
+| `port` | 입항 항구 50자 |
+| `courier` | 국내 택배사 — `couriers[].key` 중 하나 (아니면 422). 응답에 `courier_name` · `courier_codes`(마켓별 택배사 코드) 가 붙는다 |
+| `tracking_when` | 국내 송장번호가 나오는 시점 200자 |
+| `customs_ref` | UNI-PASS 통관 조회 번호(H B/L 등)와 확인 위치 200자 |
+| `confirmed` | 배대지에 확인했는지 (기본 false — FE 점검에서 경고) |
+| `note` | 2000자 |
+- 응답 전용: `transport_label` · `courier_name` · `courier_codes` (요청에 보내도 무시).
 - PATCH 로 `uses` 를 줄이면(그리고 `defaults` · `market_codes` 를 안 보내면) 빠진 용도의 기본값·마켓 번호도 같이 빠진다.
 - **FE 는 주소 하나만 쓴다** (구매대행은 출고지·반품지 모두 배대지): 기본 출고지 주소를 골라 `uses`·`defaults` 를 둘 다로 저장한다. BE 는 여러 주소를 받을 수 있게 그대로 둔다.
 - 점검(해외 주소인지, 마켓별 출고지·반품지 번호가 있는지)은 FE `utils/shippingAddress.addressChecks`.
