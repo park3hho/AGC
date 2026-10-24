@@ -706,7 +706,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 **DetailPageSummary**
 ```json
 {
-  "status": "review", "updated_at": "…", "updated_by": {"id": 3, "name": "리서처 skill"},
+  "status": "review", "created_at": "…(디자인 시작 = 첫 저장, 2026-10-24 추가)", "updated_at": "…", "updated_by": {"id": 3, "name": "리서처 skill"},
   "reviewed_at": null, "reviewed_by": null, "review_note": null
 }
 ```
@@ -790,6 +790,46 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - Request: `{"reg_no": "", "seller": "", "notice_title": "", "notice": [{"title": "", "body": ""}]}` (notice 최대 10)
 - **값이 바뀌면 승인된 상세페이지를 전부 검수 대기로 되돌린다.**
 - Response 200: `{"status": "success", "common": DetailCommon, "reset_count": 0}`
+
+### 마켓 등록 (`/listings`) — 2026-10-24
+제품을 판매처(쿠팡·네이버)에 올린 상품 1건 = 1행. 제품 1 : N (맛별로 나눠 올리면 여러 건). 판매 › 상품 › 상품 상세의 '마켓 등록'·'진행 기록(업로드 일시)'이 쓴다.
+
+**Listing**
+```json
+{
+  "id": 1, "product_id": 38, "platform": "coupang", "market_product_id": "16425945667",
+  "title": "북빙양 귤맛 탄산음료 330ml x 6캔", "url": "https://www.coupang.com/vp/products/9790651423?vendorItemId=96228038011",
+  "status": "승인완료", "listed_at": "2026-10-24T18:05:42+09:00",
+  "items": [{"option_id": 63, "name": "330ml×6캔", "sale_price": 18400, "market_item_id": "96228038011", "sku": "PR-261020-0007-63"}],
+  "source": "api", "synced_at": "…", "memo": null, "created_at": "…", "updated_at": "…"
+}
+```
+- `market_product_id` = 쿠팡 sellerProductId · 네이버 원상품번호. (`platform`, `market_product_id`) unique.
+- `listed_at` = 업로드 일시 (쿠팡은 셀러 상품 `createdAt`, KST). `status` = 마켓이 준 상태 그대로 (직접 입력이면 null).
+- `source`: `api` (마켓에서 불러옴) · `manual` (직접 입력).
+
+#### GET /listings — 목록
+- 권한: 로그인. Query `product_id` (없으면 전체, 삭제 안 된 제품만)
+- Response 200: `{"status": "success", "items": [Listing]}` — 제품 · 판매처 · 업로드 일시 순
+
+#### POST /listings — 직접 추가
+- 권한: `listing` (API 키 불가)
+- Request: `{"product_id": 38, "platform": "naver", "market_product_id": "123", "title": null, "url": null, "listed_at": "2026-10-24T18:00:00+09:00", "memo": null}` — `market_product_id` 필수(공백 제거), url 은 http(s) 만
+- 같은 번호가 살아 있으면 409, 지웠던 번호면 그 행을 살려 덮어쓴다.
+- Response 200: `{"status": "success", "listing": Listing}`
+
+#### PATCH /listings/{id} — 수정
+- 권한: `listing`. Request: `title` · `url` · `listed_at` · `memo` 중 보낸 칸만. 판매처·상품번호는 못 바꾼다.
+
+#### DELETE /listings/{id} — 삭제 (소프트)
+- 권한: `listing`. AGC 기록만 지운다 (마켓 상품은 그대로). 지운 번호는 불러오기가 다시 살리지 않는다.
+
+#### POST /listings/sync/coupang — 쿠팡에서 불러오기
+- 권한: `listing`. Query `dry_run=true` 면 저장하지 않고 결과만.
+- 쿠팡 셀러 상품 목록(`seller-products`, 100개씩) → 상품마다 상세 → 옵션 `externalVendorSku` 가 `{제품 코드}-{옵션 id}` (예: `PR-261020-0007-63`)이면 그 제품에 붙인다. 쿠팡 등록 때 SKU 를 이 모양으로 넣는다.
+- url = `https://www.coupang.com/vp/products/{productId}?vendorItemId={첫 옵션}`.
+- Response 200: `{"status": "success", "total": 3, "created": 3, "updated": 0, "skipped_deleted": 0, "unmatched": [{"market_product_id": "…", "title": "…"}], "items": [...]}`
+- 쿠팡 호출 실패 502.
 
 ### 주문 (`/orders`) — 2026-10-24
 마켓(네이버·쿠팡) 주문을 받아 저장하고, 새 주문·수취인 정보가 바뀐 주문은 **바로 통관부호를 검증**한다 (UNI-PASS API028). 권한 `order` (관리자·직원, API 키 불가). 수취인 전화·주소·통관부호와 마켓 원본 응답은 암호화 저장, 응답에는 가린 값만.
