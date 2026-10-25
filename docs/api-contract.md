@@ -843,6 +843,11 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - Response 200: `{"status": "success", "total": 3, "created": 3, "updated": 0, "skipped_deleted": 0, "unmatched": [{"market_product_id": "…", "title": "…"}], "items": [...]}`
 - 쿠팡 호출 실패 502.
 
+#### 상품 등록 배송 조건 (2026-10-25) — 등록 API 를 만들 때 적용
+- **모든 등록은 무료배송** (배송비는 판매가에 포함). 쿠팡 `deliveryChargeType=FREE`, `deliveryCharge=0`, `freeShipOverAmount=0`, `deliveryChargeOnReturn=0`, `remoteAreaDeliverable=N`. 네이버 `deliveryInfo.deliveryFee.deliveryFeeType=FREE`, `baseFee=0`, 제주·도서산간 추가비 없음.
+- 반품·교환비는 단순변심 실비만: 쿠팡 `returnCharge` 대표가 ≤ 20,000원 5,000 · 초과 10,000. 네이버 `claimDeliveryInfo.returnDeliveryFee` 같은 금액, `exchangeDeliveryFee` 는 2배(왕복).
+- 자세한 표: BE DESIGN §6.7.
+
 ### 주문 (`/orders`) — 2026-10-24
 마켓(네이버·쿠팡) 주문을 받아 저장하고, 새 주문·수취인 정보가 바뀐 주문은 **바로 통관부호를 검증**한다 (UNI-PASS API028). 권한 `order` (관리자·직원, API 키 불가). 수취인 전화·주소·통관부호와 마켓 원본 응답은 암호화 저장, 응답에는 가린 값만.
 
