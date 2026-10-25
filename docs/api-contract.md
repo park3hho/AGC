@@ -737,13 +737,22 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ```json
 {
   "hero": {"eyebrow": "", "headline": "첫 줄\n*강조* 둘째 줄", "name": "", "name_sub": "", "badges": [{"value": "0kcal", "label": "무설탕"}], "photo_url": "/files/…"},
-  "points": {"title": "이런 음료예요", "lead": "", "items": [{"title": "", "desc": "", "big": "0", "big_unit": "kcal / 병"}]},
-  "flavors": {"title": "맛을 골라주세요", "lead": "", "items": [{"name": "라임", "name_cn": "青柠口味", "desc": "", "chips": ["상큼"], "photo_url": "/files/…"}], "notes": [""]},
-  "info": {"title": "제품 정보", "rows": [{"label": "원재료", "value": ""}], "nutrition": [{"value": "0kcal", "label": "열량"}], "note": ""},
+  "points": {"title": "이런 음료예요", "lead": "", "items": [{"title": "", "desc": "", "big": "0", "big_unit": "kcal / 병", "photo_url": null}]},
+  "flavors": {"title": "맛을 골라주세요", "lead": "", "items": [{"name": "라임", "name_cn": "青柠口味", "desc": "", "chips": ["상큼"], "photo_url": "/files/…"}], "notes": [""],
+              "gallery": {"title": "이렇게 보내드려요", "items": [{"photo_url": "/files/…", "caption": ""}]}},
+  "info": {"title": "제품 정보", "rows": [{"label": "원재료", "value": ""}], "nutrition": [{"value": "0kcal", "label": "열량"}], "note": "",
+           "label_photo_url": null, "label_caption": ""},
   "howto": {"title": "이렇게 드세요", "items": [{"icon": "cold", "title": "", "desc": ""}]}
 }
 ```
-- 줄바꿈 `\n` = 줄, `*글자*` = 파란 강조 (headline). 개수 한도: badges 4 · points 4 · flavors 12 · chips 4 · notes 4 · info rows 15 · nutrition 6 · howto 4. `icon`: `cold` · `run` · `bottle` · `cup` · `clock` · `sun`.
+- 줄바꿈 `\n` = 줄, `*글자*` = 파란 강조 (headline). 개수 한도: badges 4 · points 4 · flavors 12 · chips 4 · notes 4 · info rows 15 · nutrition 6 · howto 4 · gallery 4. `icon`: `cold` · `run` · `bottle` · `cup` · `clock` · `sun`.
+- 사진 칸 (2026-10-25, 모두 선택 — 비면 안 그림, 값은 GET 의 `photos[].url` 중 아무거나):
+  - `hero.photo_url`: S1 대표 사진. 원래 비율로 860 폭, 1100px 넘는 세로 사진만 위 기준으로 자른다.
+  - `points.items[].photo_url`: 있으면 S2 사진 카드 (사진 위 440px · 번호·글 아래).
+  - `flavors.items[].photo_url`: 맛 카드 사진 — 그 옵션 사진이 아니어도 된다. 없으면 글만 있는 카드.
+  - `flavors.gallery`: S3 끝 구성·포장 사진 0~4장 (1장 = 전체 폭 원래 비율, 2장 이상 = 2열). `caption` 선택.
+  - `info.label_photo_url` · `info.label_caption`: S4 정보 표 위 '현지 라벨 원본' 사진.
+- 새 페이지 템플릿: `hero.photo_url` = 제품 대표 사진, 맛 카드 = 옵션별 사진, 남는 추가 사진은 `points.items[0..2].photo_url` 에 차례로 미리 넣는다.
 
 ### PUT /detail-pages/{product_id} — 저장 (없으면 초안으로 만든다)
 - 권한: `research`
