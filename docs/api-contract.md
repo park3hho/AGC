@@ -748,11 +748,11 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 줄바꿈 `\n` = 줄, `*글자*` = 파란 강조 (headline). 개수 한도: badges 4 · points 4 · flavors 12 · chips 4 · notes 4 · info rows 15 · nutrition 6 · howto 4 · gallery 4. `icon`: `cold` · `run` · `bottle` · `cup` · `clock` · `sun`.
 - 사진 칸 (2026-10-25, 모두 선택 — 비면 안 그림, 값은 GET 의 `photos[].url` 중 아무거나):
   - `hero.photo_url`: S1 대표 사진. 원래 비율로 860 폭, 1100px 넘는 세로 사진만 위 기준으로 자른다.
-  - `points.items[].photo_url`: 있으면 S2 사진 카드 (사진 위 440px · 번호·글 아래).
+  - `points.items[].photo_url`: 있으면 S2 사진 카드. 사진은 자르지 않고(contain) 비율로 배치 — 가로는 위 전체 폭, 세로·정사각은 글 옆 (2026-10-25b). 다른 사진 칸도 모두 자르지 않는다.
   - `flavors.items[].photo_url`: 맛 카드 사진 — 그 옵션 사진이 아니어도 된다. 없으면 글만 있는 카드.
   - `flavors.gallery`: S3 끝 구성·포장 사진 0~4장 (1장 = 전체 폭 원래 비율, 2장 이상 = 2열). `caption` 선택.
   - `info.label_photo_url` · `info.label_caption`: S4 정보 표 위 '현지 라벨 원본' 사진.
-- 새 페이지 템플릿: `hero.photo_url` = 제품 대표 사진, 맛 카드 = 옵션별 사진, 남는 추가 사진은 `points.items[0..2].photo_url` 에 차례로 미리 넣는다.
+- 새 페이지 템플릿: `hero.photo_url` = 제품 대표 사진, 맛 카드 = 옵션별 사진, 포인트 사진은 비워 둔다(null — 자동으로 채우지 않음, 2026-10-25b).
 
 ### PUT /detail-pages/{product_id} — 저장 (없으면 초안으로 만든다)
 - 권한: `research`
