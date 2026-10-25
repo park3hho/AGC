@@ -336,6 +336,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `login_id` | ✅ | 1~200자 |
   | `password` | ✅ | 1~500자. BE 가 암호화해서 저장 (응답·로그에 나오지 않음) |
   | `usages` | | 문자열 배열, 각 1~30자, 최대 10개, 중복은 하나로 합침. 기본 `[]` |
+  | `memo` | | 비고 1000자 (예: 연동 휴대폰). 비우면 `null`. 비밀값은 넣지 않는다 (목록에 그대로 보인다) — 2026-10-25 |
   | `url` | | 홈페이지. http/https 만, 500자 이하. `www.…` 처럼 주소만 보내면 `https://` 를 붙여 저장. 빈 값·`null` = 없음 |
 - Response 200: `{"status": "success", "account": CompanyAccount}` · 422 (주소 형식 오류 등)
 
@@ -346,7 +347,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ### PATCH /company-accounts/{account_id} — 회사 계정 수정
 보낸 필드만 바꾼다.
 - 권한: `account_edit`
-- Request: POST 와 같은 필드, 전부 선택. `password` 는 **보냈을 때만** 새로 암호화해 바꾼다 (안 보내면 그대로). `url` 에 `null`·`""` 을 보내면 지운다. `platform`·`login_id`·`usages` 에 `null` 은 422.
+- Request: POST 와 같은 필드, 전부 선택. `password` 는 **보냈을 때만** 새로 암호화해 바꾼다 (안 보내면 그대로). `url` · `memo` 에 `null`·`""` 을 보내면 지운다. `platform`·`login_id`·`usages` 에 `null` 은 422.
 - Response 200: `{"status": "success", "account": CompanyAccount}` · 400 (바꿀 필드 없음) · 404
 
 ### DELETE /company-accounts/{account_id} — 회사 계정 삭제 (소프트)
@@ -363,7 +364,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 **CompanyAccount**
 ```json
 {
-  "id": 1, "platform": "식품안전나라", "login_id": "agc01", "usages": ["인허가"],
+  "id": 1, "platform": "식품안전나라", "login_id": "agc01", "usages": ["인허가"], "memo": null,
   "url": "https://www.foodsafetykorea.go.kr",
   "created_at": "2026-10-18T13:00:00+00:00", "updated_at": "2026-10-18T13:00:00+00:00"
 }
