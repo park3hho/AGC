@@ -914,3 +914,14 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | `cn_courier` · `cn_tracking_no` | | 중국 택배사 · 운송장 (운송장은 공백 제거) |
 
 **Purchase** — 위 칸 + `id` · `order` `{id, code, market, order_no, line_no, product_name, option_name, quantity}` · `purchased_by` `{id, name}`(등록한 사람) · `status_source` (`manual` · 나중에 폴링이 채우면 `poll`) · `status_checked_at` · `created_at` · `updated_at`.
+
+### 집운 기록 (`/jiyun-shipments`) — 2026-10-25
+집운(배대지)에 배송 요청하고 배송비를 낸 기록 — 집운 번호(배송 요청 번호) 1개 = 1건, 고객 주문(MarketOrder) 1건에 붙는다 (여러 건 가능). 권한 `order`. 바꿀 때마다 그 고객 주문의 추적 기록 `jiyun_created` · `jiyun_changed` · `jiyun_deleted` (data: `jiyun_id` · `step: 국제 발송` · `refs`(집운 번호·H B/L·국내 택배·송장) · `values`/`changes` 이전값→새값).
+
+| Method | Path | 설명 |
+|---|---|---|
+| GET | `/jiyun-shipments?order_id=&status=&q=&limit=` | 목록 (최신 먼저). `q` = 집운 번호 |
+| POST | `/jiyun-shipments` | 추가 — `order_id` · `jiyun_no` 필수. 같은 집운 번호가 살아 있으면 409. 취소된 주문 409 |
+| GET · PATCH · DELETE | `/jiyun-shipments/{id}` | 조회 · 보낸 필드만 수정 · 소프트 삭제 (기록은 남음) |
+
+칸: `status`(requested 배송 요청 · dispatched 출고 · problem · cancelled — 출고로 바꾸고 출고 시각이 비면 지금) · `packages`(묶인 중국 운송장) · `weight_kg` · `fee_cny` · `transport`(sea·air) · `requested_at` · 실제 결제 `pay_method`·`pay_currency`·`pay_amount`·`charged_krw`·`charged_status`(none 미확인·approved·settled)·`charged_at`·`charged_source` (타오바오 구매기록과 같은 규칙) · `dispatched_at` · `hbl`(통관 조회 번호) · `kr_courier`(`core/shipping_config.COURIERS` 키) · `kr_tracking_no`(마켓 발송처리용) · `memo`.
