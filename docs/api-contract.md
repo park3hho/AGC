@@ -846,12 +846,15 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | GET | `/orders?stage=received&market=&pccc=&q=&page=&size=` | 목록 + `pccc_counts` + 마켓별 `last_runs` + `poll_minutes`. `q` = 자사 코드(`OR-…`) · 마켓 주문번호 · 줄 번호 검색 |
 | POST | `/orders/collect` | 지금 가져오기. body `{"markets": ["naver","coupang"], "since_hours": null}` — 비우면 지난 수집 끝 −10분부터(처음이면 3일). 409 = 이미 수집 중 |
 | GET | `/orders/sync-runs?market=&limit=` | 수집 기록 |
-| GET | `/orders/{id}` | `{"order": Order, "events": [OrderEvent]}` (최신 먼저) |
+| GET | `/orders/{id}` | `{"order": Order, "events": [OrderEvent], "raw_masked": {...}, "receiver_full": ReceiverFull}` (events 최신 먼저) |
 | POST | `/orders/{id}/pccc-check` | 통관부호 다시 검증 (사람) → 위와 같은 응답 |
 
 - 마켓 → 줄: 네이버 = `productOrderId` 1개 (변경 상품 주문 조회 → 상세 조회), 쿠팡 = `shipmentBoxId` 안 옵션 1개 (발주서 목록, 상태 ACCEPT·INSTRUCT).
 - 검증 입력: 이름 = 수취인, 전화 = 쿠팡 `overseaShippingInfoDto.ordererPhoneNumber`(안심번호 아님) · 네이버 `shippingAddress.tel1`, 우편번호 = 수취인 5자리. 옛 6자리 우편번호·휴대폰 아님·일회용 부호(인증번호 없음)는 `missing`.
 - `pccc_status`: `ok` 일치 · `mismatch` 불일치(사유 `pccc_message`) · `missing` 자동 검증 못 함 · `error` 관세청 장애 · `pending`.
+- **전화번호 두 가지 (2026-10-25, 덮어쓰지 않고 따로 저장)** — ① **통관용** `customs_phone` = 구매자가 통관 정보로 넣은 번호 (쿠팡 `overseaShippingInfoDto.ordererPhoneNumber` · 네이버 `shippingAddress.tel1`). 통관부호 검증·타오바오 한국 주소에 쓴다. ② **쇼핑몰 연락처** `contact_phone` = 쿠팡 `receiver.receiverNumber` → 없으면 `safeNumber`(안심번호 050…) · 네이버 `tel1`(없으면 `tel2`). 고객 연락·국내 배송용. UNI-PASS API028 은 일치 여부(`tCnt`)만 돌려주고 전화번호를 주지 않는다 — 두 번호 모두 마켓 주문 API 에서 온다.
+- `Order.receiver` (목록·상세, 가린 값) `{name, phone(통관용), contact_phone, zip, address(앞 2단어), pccc}`.
+- **ReceiverFull** (상세 전용, 원본 — 타오바오 주문·배송에 씀) `{"name", "zip", "address", "customs_phone", "contact_phone", "pccc"}`. 목록 응답에는 넣지 않는다.
 - 자동 수집은 `ORDER_POLL_MINUTES`(기본 0 = 꺼짐).
 ### 타오바오 구매 · 중국 내 배송 (`/taobao-purchases`) — 2026-10-24
 고객이 마켓에서 주문 → 우리가 타오바오에서 구매 → 판매처가 **집운 창고**까지 보내는 구간. **타오바오 주문번호 하나로 식별**하고, **고객 주문(MarketOrder) 1건에 붙는 기록**이다. 기본은 고객 주문 1건 = 타오바오 주문 1건 (같은 고객 주문에 여러 개 붙는 것은 막지 않음). 권한 `order`. 집운 쪽 매칭(입고 번호 등)·국제 발송은 범위 밖 — 나중에 따로.
