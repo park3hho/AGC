@@ -856,7 +856,17 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - `Order.receiver` (목록·상세, 가린 값) `{name, phone(통관용), contact_phone, zip, address(앞 2단어), pccc}`.
 - **ReceiverFull** (상세 전용, 원본 — 타오바오 주문·배송에 씀) `{"name", "zip", "address", "customs_phone", "contact_phone", "pccc"}`. 목록 응답에는 넣지 않는다.
 - 자동 수집은 `ORDER_POLL_MINUTES`(기본 0 = 꺼짐).
+#### POST /orders/{id}/confirm — 발주확인 (2026-10-25)
+- 권한: `order`. 마켓에 '주문 확인'을 보낸다 → 고객 화면 결제완료 → **상품준비중** (즉시 취소가 막히고 취소 요청 → 판매자 승인으로 바뀜).
+  - 쿠팡: `PUT /v2/providers/openapi/apis/api/v4/vendors/{vendorId}/ordersheets/acknowledgement` `{"vendorId", "shipmentBoxIds": [ship_unit_no]}` — `market_status = ACCEPT` 일 때만 (아니면 409 "먼저 다시 수집").
+  - 네이버: `POST /v1/pay-order/seller/product-orders/confirm` `{"productOrderIds": [ship_unit_no]}` (30건씩).
+- 성공: 같은 `market + ship_unit_no` 의 주문 줄 모두 `confirmed = true` (쿠팡은 `market_status = INSTRUCT`), 줄마다 OrderEvent `market_confirmed` (data.sent · received · changes).
+- 이미 확인된 주문: 마켓에 다시 보내지 않고 200 + `"already": true`.
+- 실패(취소 요청됨 · 상태 다름 · 마켓 오류): 409 + 마켓이 준 이유, OrderEvent `market_confirm_failed`. 취소된 주문은 409.
+- Response 200: `GET /orders/{id}` 와 같은 모양 (+ `already`).
+
 ### 타오바오 구매 · 중국 내 배송 (`/taobao-purchases`) — 2026-10-24
+- **등록(POST)은 발주확인된 주문만** (2026-10-25): `confirmed = false` 면 409 "먼저 마켓에 발주확인을 보내 주세요", 취소된 주문도 409. 수정·삭제는 그대로.
 고객이 마켓에서 주문 → 우리가 타오바오에서 구매 → 판매처가 **집운 창고**까지 보내는 구간. **타오바오 주문번호 하나로 식별**하고, **고객 주문(MarketOrder) 1건에 붙는 기록**이다. 기본은 고객 주문 1건 = 타오바오 주문 1건 (같은 고객 주문에 여러 개 붙는 것은 막지 않음). 권한 `order`. 집운 쪽 매칭(입고 번호 등)·국제 발송은 범위 밖 — 나중에 따로.
 
 **추적성** — 추가·수정·삭제마다 그 고객 주문의 `OrderEvent` 한 줄: `kind` = `purchase_created` · `purchase_changed` · `purchase_deleted`, `data.changes` = `{칸: {"from": 이전값, "to": 새값}}` (개인정보 없음). 값이 그대로면 기록하지 않는다.
