@@ -553,6 +553,12 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   ```
 - Response 404 (제품이 없거나 삭제됨)
 
+- **묶음 판매 (2026-10-26)** — 판매 옵션 = 조사 옵션 × 묶음 수(`bundle_qty`). 묶음 1 = 조사 옵션 그대로 (`option_prices`, 지금까지와 같음).
+  - 응답 `bundles`: 묶음 판매 옵션 = **10kg 제안**(`suggested`) + 어느 판매처든 판매가가 저장된 묶음(`saved`). 각 줄은 옵션 모양(`price_cny` · `volume_ml` · `weight_g` · `billable_kg` · `shipping_cny` · `over_limit` 모두 **묶음 전체 기준**, 박스 1개) +
+    `key`("66x2") · `option_id` · `bundle_qty` · `market_option1`/`market_option2`(마켓에 올릴 이름, 개수 N배 "330ml×48캔") · `pack_note`("24캔×2") · `total_count`(48) · `over_duty_free`(상품가 > $150, 위안→달러 7.1 근사) · `sku`(`PR-…-66x2`).
+  - 제안 규칙 (`core/shipping_config` 묶음 판매): 제품에서 가장 무거운 옵션(같은 용량이면 맛별 전부)도 `BUNDLE_TARGET_KG`(10kg) 미만이면, 10kg 이상이 되는 가장 작은 N (2~`BUNDLE_MAX_QTY` 10). 30kg 초과 · 면세 초과면 제안하지 않는다.
+  - `Pricing.bundle_prices`: 묶음 2 이상 판매가 `[{option_id, bundle_qty, sale_price, listing_group, is_base}]`. `option_prices` 의 각 줄에도 `bundle_qty: 1` 이 붙는다.
+  - 마켓 판매자 코드(쿠팡 `externalVendorSku`) = `{제품 코드}-{옵션 id}` · 묶음이면 `{제품 코드}-{옵션 id}x{N}`. 쿠팡에서 불러오기와 주문 → 타오바오 구매 연결이 이 코드를 읽는다.
 ### PUT /products/{product_id}/pricing/{platform} — 판매처 가격 저장
 `platform` = `coupang` | `naver`. 그 판매처 설정과 옵션 판매가를 **통째로 바꾼다** (전부 성공 또는 전부 실패). 다른 판매처 값은 건드리지 않는다.
 - 권한: `research`
@@ -574,7 +580,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `shipping_fee` | ✅ | 0 이상 정수 (원) |
   | `platform_fee_rate` | ✅ | 0~100, 소수 2자리 (%) |
   | `payment_fee_rate` | | 0~100, 소수 2자리. 기본 0 |
-  | `option_prices` | ✅ | 그 조사의 옵션만, 같은 옵션 중복 불가 (아니면 400). `sale_price` 는 1 이상 정수 (원). 빠진 옵션은 판매가 없음으로 저장 |
+  | `option_prices` | ✅ | 그 조사의 옵션만, 같은 (옵션, `bundle_qty`) 중복 불가 (아니면 400). `bundle_qty` 1~10, 기본 1 (묶음 판매). `sale_price` 는 1 이상 정수 (원). 빠진 옵션은 판매가 없음으로 저장 |
   | `option_prices[].listing_group` | | (네이버) 이 옵션을 넣을 상품 번호 1~50 — 사람이 직접 옮긴 것만. `null`(기본) = 자동 (FE `naverListingPlan`: 한 상품에 다 들어가면 1개, 아니면 용량·입수별 → 가격으로 나눔) |
   | `option_prices[].is_base` | | (네이버) 그 상품의 대표 옵션(추가금 0원)으로 직접 지정. 기본 `false` = 자동 (한도 안에 드는 가장 싼 옵션) |
   | `base_option_id` | | **예전 방식 (2026-10-20 부터 안 씀 — 옵션별 `is_base`)** 대표 옵션 (네이버 추가금 0원). `option_prices` 에 판매가가 있는 옵션이어야 함 (아니면 400). `null`(기본) = 자동 — FE 가 추가금 한도를 만족하는 가장 싼 옵션을 고른다 |
@@ -870,6 +876,10 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - `Order.receiver` (목록·상세, 가린 값) `{name, phone(통관용), contact_phone, zip, address(앞 2단어), pccc}`.
 - **ReceiverFull** (상세 전용, 원본 — 타오바오 주문·배송에 씀) `{"name", "zip", "address", "customs_phone", "contact_phone", "pccc"}`. 목록 응답에는 넣지 않는다.
 - 자동 수집은 `ORDER_POLL_MINUTES`(기본 0 = 꺼짐).
+#### GET /orders/{id} — `sourcing` (2026-10-26)
+타오바오에서 살 것. 판매자 코드 `PR-…-{옵션 id}[x{N}]` → 없으면 마켓 등록 기록(`market_listing.items`)의 마켓 옵션 id → 제품 코드만 있으면 제품까지.
+`{product_id, product_code, product_title, taobao_url, option_id, option1, option2, price_cny, bundle_qty, taobao_qty(= 주문 수량 × 묶음), matched_by(sku·listing·product_code)}` · 못 찾으면 `null`.
+타오바오 구매기록 추가 화면이 옵션 이름 · 개수 · 단가 · 상품 링크를 미리 채운다.
 #### POST /orders/{id}/confirm — 발주확인 (2026-10-25)
 - 권한: `order`. 마켓에 '주문 확인'을 보낸다 → 고객 화면 결제완료 → **상품준비중** (즉시 취소가 막히고 취소 요청 → 판매자 승인으로 바뀜).
   - 쿠팡: `PUT /v2/providers/openapi/apis/api/v4/vendors/{vendorId}/ordersheets/acknowledgement` `{"vendorId", "shipmentBoxIds": [ship_unit_no]}` — `market_status = ACCEPT` 일 때만 (아니면 409 "먼저 다시 수집").
