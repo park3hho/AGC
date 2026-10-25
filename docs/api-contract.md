@@ -73,6 +73,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `photo_url` | | `http(s)://` 주소 또는 `POST /uploads/photos` 가 준 `/files/...` 경로, 1000자 이하 |
   | `title_cn` | ✅ | 1~300자 |
   | `title_ko` | | 300자 이하 |
+  | `photos` | | 추가 사진(갤러리) 주소 목록 — 각 주소는 `photo_url` 과 같은 규칙, 같은 주소는 한 번, 최대 10장. 대표 사진(`photo_url`)은 넣지 않는다 (2026-10-25) |
 - Response 200: `{"status": "success", "product": Product}`
 - Response 409: 코드 발급 충돌 (드묾 — 다시 시도)
 
@@ -102,6 +103,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `title_cn` | 1~300자. `null`·빈 값 불가 |
   | `title_ko` | 300자 이하. `null` 이면 지움 |
   | `photo_url` | POST 와 같음. `null` 이면 지움 |
+  | `photos` | POST 와 같음. 보내면 목록 전체를 바꾼다 (순서 그대로). `[]` 이면 비움 |
 - Response 200: `{"status": "success", "product": Product}`
 - Response 400: 바꿀 필드가 없음 · 404 (없거나 삭제됨)
 
@@ -114,7 +116,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 **Product**
 ```json
 {
-  "id": 1, "code": "PR-261018-0001", "photo_url": null,
+  "id": 1, "code": "PR-261018-0001", "photo_url": null, "photos": [],
   "title_cn": "无线蓝牙耳机", "title_ko": "무선 블루투스 이어폰",
   "created_at": "2026-10-18T13:00:00+00:00", "updated_at": "2026-10-18T13:00:00+00:00"
 }
