@@ -558,6 +558,10 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
     `key`("66x2") · `option_id` · `bundle_qty` · `market_option1`/`market_option2`(마켓에 올릴 이름, 개수 N배 "330ml×48캔") · `pack_note`("24캔×2") · `total_count`(48) · `over_duty_free`(상품가 > $150, 위안→달러 7.1 근사) · `sku`(`PR-…-66x2`).
   - 제안 규칙 (`core/shipping_config` 묶음 판매): 제품에서 가장 무거운 옵션(같은 용량이면 맛별 전부)도 `BUNDLE_TARGET_KG`(10kg) 미만이면, 10kg 이상이 되는 가장 작은 N (2~`BUNDLE_MAX_QTY` 10). 30kg 초과 · 면세 초과면 제안하지 않는다.
   - `Pricing.bundle_prices`: 묶음 2 이상 판매가 `[{option_id, bundle_qty, sale_price, listing_group, is_base}]`. `option_prices` 의 각 줄에도 `bundle_qty: 1` 이 붙는다.
+  - **채택** (`product_bundle`, migration 26): 묶음을 판매 옵션으로 넣는 결정은 판매가와 따로 남긴다 (판매가는 사람이 정함). 응답 `bundles[].adopted`.
+    `POST /products/{id}/pricing/bundles` `{option_id, bundle_qty(2~10)}` — 최신 조사 옵션만, 30kg 초과면 400. 다시 넣으면 같은 줄을 살림.
+    `DELETE /products/{id}/pricing/bundles/{option_id}/{bundle_qty}` — 채택만 풂 (저장된 판매가는 가격 책정 저장으로 지움). 제품 목록 `bundle_unpriced` = 채택한 묶음 중 판매가 빈 칸 수 (판매처 × 묶음).
+    2026-10-26 가격 책정 끝난 제품의 10kg 제안을 일괄 채택 (`source=rule`, 105개 제품 · 215묶음, 판매가 없음).
   - 마켓 판매자 코드(쿠팡 `externalVendorSku`) = `{제품 코드}-{옵션 id}` · 묶음이면 `{제품 코드}-{옵션 id}x{N}`. 쿠팡에서 불러오기와 주문 → 타오바오 구매 연결이 이 코드를 읽는다.
 ### PUT /products/{product_id}/pricing/{platform} — 판매처 가격 저장
 `platform` = `coupang` | `naver`. 그 판매처 설정과 옵션 판매가를 **통째로 바꾼다** (전부 성공 또는 전부 실패). 다른 판매처 값은 건드리지 않는다.
