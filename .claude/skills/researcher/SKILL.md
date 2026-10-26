@@ -201,7 +201,11 @@ POST /uploads/photos/from-url   {"url": "https://img.alicdn.com/...jpg"}
 | 소비기한·보관 방법 | 파라미터 `保质期`·`储藏方法` |
 
 - 확인 못 한 항목은 비워 두지 말고 "못 찾음 (확인한 곳: …)"으로 보고한다.
-- 저장 위치: AGC 에 아직 전용 칸이 없다. 칸이 생기기 전까지는 조사 보고에 제품별로 함께 적는다.
+- 저장 위치 (2026-10-27 추가):
+  - 제품: `POST /products` 또는 `PATCH /products/{id}` 의 `manufacturer` · `ingredients` · `allergens` · `shelf_life` · `storage`
+    (원재료가 맛마다 다르면 줄마다 `맛: 원재료`, 한국어로 옮긴다. 제조사는 중국어 법인명 그대로 적고 한국어 표기는 상세페이지에서)
+  - 옵션: `POST /price-surveys` 의 `options[].barcode`, 나중에 찾으면 `PATCH /price-surveys/{id}/options/{option_id}` 의 `barcode`
+  - 상세페이지 초안이 이 값으로 '제품 정보' 표를 채운다. 비워 두면 노란 `[[...]]` 로 남는다.
 
 ## 4. 가격 입력
 

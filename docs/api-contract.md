@@ -74,6 +74,12 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `title_cn` | ✅ | 1~300자 |
   | `title_ko` | | 300자 이하 |
   | `photos` | | 추가 사진(갤러리) 주소 목록 — 각 주소는 `photo_url` 과 같은 규칙, 같은 주소는 한 번, 최대 10장. 대표 사진(`photo_url`)은 넣지 않는다 (2026-10-25) |
+  | `manufacturer` | | 제조사(공장 법인명), 300자 이하 (2026-10-27) |
+  | `ingredients` | | 원재료, 5000자 이하. 맛마다 다르면 줄마다 `맛: 원재료` (2026-10-27) |
+  | `allergens` | | 알레르기 유발 성분 (예: `우유, 대두`), 300자 이하 (2026-10-27) |
+  | `shelf_life` | | 소비기한 (예: `12개월`), 100자 이하 (2026-10-27) |
+  | `storage` | | 보관 방법, 300자 이하 (2026-10-27) |
+  - 제품 정보 5개는 리서치 때 함께 찾아 넣는다. 상세페이지 초안(`build_template`)이 이 값으로 '제품 정보' 표를 채우고, 빈 값만 `[[...]]` 확인 표시로 남는다.
 - Response 200: `{"status": "success", "product": Product}`
 - Response 409: 코드 발급 충돌 (드묾 — 다시 시도)
 
@@ -104,6 +110,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `title_ko` | 300자 이하. `null` 이면 지움 |
   | `photo_url` | POST 와 같음. `null` 이면 지움 |
   | `photos` | POST 와 같음. 보내면 목록 전체를 바꾼다 (순서 그대로). `[]` 이면 비움 |
+  | `manufacturer` · `ingredients` · `allergens` · `shelf_life` · `storage` | POST 와 같음. `null`·빈 값이면 지움 |
 - Response 200: `{"status": "success", "product": Product}`
 - Response 400: 바꿀 필드가 없음 · 404 (없거나 삭제됨)
 
@@ -118,6 +125,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 {
   "id": 1, "code": "PR-261018-0001", "photo_url": null, "photos": [],
   "title_cn": "无线蓝牙耳机", "title_ko": "무선 블루투스 이어폰",
+  "manufacturer": null, "ingredients": null, "allergens": null, "shelf_life": null, "storage": null,
   "created_at": "2026-10-18T13:00:00+00:00", "updated_at": "2026-10-18T13:00:00+00:00"
 }
 ```
@@ -158,6 +166,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `options[].option2` | | 200자 이하 |
   | `options[].price_cny` | ✅ | 0 초과, 소수 둘째 자리까지 |
   | `options[].photo_url` | | 옵션별 사진 (예: 맛별 사진). 규칙은 `photo_url` 과 같음 |
+  | `options[].barcode` | | 바코드(GTIN). 공백·하이픈을 지운 뒤 숫자 8~14자리만 (중국 상품은 보통 69로 시작하는 13자리). 모르면 비운다 — 임의 번호 금지. 쿠팡 공식 브랜드 상품 등록에 필요 (2026-10-27) |
 - Response 200: `{"status": "success", "price_survey": PriceSurvey}`
 - Response 404: 제품 코드 없음(삭제된 제품 포함) · 409: 코드 발급 충돌 (드묾 — 다시 시도)
 
@@ -200,6 +209,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `option1` | 1~200자, 비울 수 없음 |
   | `option2` | 200자 이하, `null` 이면 지움 |
   | `photo_url` | POST 의 `photo_url` 과 같음 |
+  | `barcode` | POST 의 `options[].barcode` 와 같음. `null`·빈 값이면 지움 (2026-10-27) |
   | (`price_cny` 등 다른 필드) | 무시 — 가격 변경은 판매가 재계산이 필요해서 여기서 받지 않음 |
 - Response 200: `{"status": "success", "price_survey": PriceSurvey}`
 - Response 400 (바꿀 필드 없음) · 404 (조사 또는 그 조사의 옵션이 아님) · 409 (같은 (옵션1, 옵션2) 조합이 이미 있음)
@@ -220,8 +230,8 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   "naver_min_price": null, "naver_url": null,
   "option_count": 2,
   "options": [
-    {"id": 1, "option1": "검정", "option2": "L", "price_cny": "39.90", "photo_url": "/files/photos/..."},
-    {"id": 2, "option1": "흰색", "option2": null, "price_cny": "42.00", "photo_url": null}
+    {"id": 1, "option1": "검정", "option2": "L", "price_cny": "39.90", "photo_url": "/files/photos/...", "barcode": "6901234567892"},
+    {"id": 2, "option1": "흰색", "option2": null, "price_cny": "42.00", "photo_url": null, "barcode": null}
   ],
   "created_at": "...", "updated_at": "..."
 }
