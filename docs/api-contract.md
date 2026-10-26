@@ -788,7 +788,8 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 ### POST /detail-pages/{product_id}/approve — 확인 (휴먼 체크 = 승인)
 - 권한: `detail_review` — **API 키 불가 (사람만)**
 - Request: `{"note": null}` — `checks` 는 예전 호환용으로 받기만 하고 무시한다 (2026-10-22)
-- `draft` · `review` · `changes` 어디서든 바로 `approved`. 등록번호 미입력 · 확인 표시 `[[...]]` 남음은 **막지 않는다** (FE 가 경고만)
+- `draft` · `review` · `changes` 어디서든 바로 `approved`. 등록번호 미입력은 막지 않는다 (FE 경고만).
+- **409: 확인 표시 `[[...]]`가 내용 · 공통 안내(등록번호 칸 제외)에 남아 있음** — 메시지에 남은 칸 수와 자리(최대 8개)를 적는다 (2026-10-26 사용자 요청. 10-22 에 풀었던 조건을 다시 건다 — 그 사이 API 일괄 승인으로 표시가 남은 채 승인된 페이지가 이미지로 나갔음). `DetailPage.markers` = `[{path, where, text}]` (예: `S4 제품 정보 · 원재료`). 이미 승인된 페이지 상태는 바꾸지 않는다.
 - 400: 이미 승인됨 · 404: 상세페이지 없음
 - Response 200: `{"status": "success", "page": DetailPage}` — `reviewed_by` · `reviewed_at` 가 채워진다 (`review_checks` 는 예전 기록용, 새로는 null)
 
@@ -796,7 +797,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 권한: `detail_review` — **API 키 불가 (사람만)**
 - Request: `multipart/form-data` — `platform` (`naver` | `coupang`), `content_hash` (그릴 때의 `page.content_hash`, 64자), `template` (FE 템플릿 버전, 선택), `files` (네이버는 PNG · 쿠팡은 JPG 여러 개, 위에서부터 순서대로). 판매처 하나씩 올린다.
 - 검사: 형식 = 판매처 형식 (`naver` PNG · `coupang` JPEG, 파일 내용으로 판단) · 조각 폭 = 판매처 폭 (`naver` 860 · `coupang` 780) · 높이 1~3000 · 장당 `naver` 20MB · `coupang` 10MB 이하 · `coupang` 높이 합계 30,000px 이하 · 1~20장 · 합계 45MB 이하.
-- 400: 승인(`approved`) 아님 · 폭/높이/개수 안 맞음 · 409: `content_hash` 가 지금 내용과 다름(그 사이 바뀜) 또는 동시 저장 겹침 · 413: 장당/합계 크기 초과 · 415: 판매처 형식 아님 · 404
+- 400: 승인(`approved`) 아님 · 폭/높이/개수 안 맞음 · 409: 확인 표시 `[[...]]`가 남음 (approve 와 같은 검사, 2026-10-26) · `content_hash` 가 지금 내용과 다름(그 사이 바뀜) 또는 동시 저장 겹침 · 413: 장당/합계 크기 초과 · 415: 판매처 형식 아님 · 404
 - Response 200: `{"status": "success", "export": DetailExport}`
 
 **DetailExport** = `{"platform": "naver", "version": 1, "content_hash": "…", "current": true, "template": "s1-s6@2026-10-24", "files": [{"url": "/files/detail/PR-261019-0005/v1/PR-261019-0005_naver_01.png", "width": 860, "height": 2890, "size": 512345, "sha256": "…"}], "created_at", "created_by": {"id","name"}|null}`
