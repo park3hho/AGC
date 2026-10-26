@@ -189,6 +189,21 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `options` | POST 와 같음 (1개 이상, 중복 불가) |
 - Response 200: `{"status": "success", "price_survey": PriceSurvey}`
 - Response 400: 바꿀 필드가 없음 · 404 (없거나 삭제됨)
+- ⚠️ **`options` 를 보내면 옵션 행을 지우고 새 id 로 다시 만든다.** 그 옵션에 저장된 판매가(`option_price`)가 CASCADE 로 함께 지워지고, 마켓 등록(listing `items[].option_id`)과의 연결도 끊긴다 (2026-10-25 사고: 판매가 5개 제품 삭제 후 재계산 복구). 이름·사진만 고칠 때는 아래 옵션 단건 수정을 쓴다.
+
+### PATCH /price-surveys/{survey_id}/options/{option_id} — 옵션 1개 제자리 수정
+옵션 `id` 와 `price_cny` 는 그대로 두고 이름·사진만 바꾼다 → 저장된 판매가와 마켓 등록 연결이 유지된다. (2026-10-26)
+- 권한: `research`
+- Request: `{"option1": "서머블랙 포도"}` · `{"option2": "125g×6팩"}` · `{"photo_url": "/files/..."}` (보낸 필드만)
+  | 필드 | 규칙 |
+  |---|---|
+  | `option1` | 1~200자, 비울 수 없음 |
+  | `option2` | 200자 이하, `null` 이면 지움 |
+  | `photo_url` | POST 의 `photo_url` 과 같음 |
+  | (`price_cny` 등 다른 필드) | 무시 — 가격 변경은 판매가 재계산이 필요해서 여기서 받지 않음 |
+- Response 200: `{"status": "success", "price_survey": PriceSurvey}`
+- Response 400 (바꿀 필드 없음) · 404 (조사 또는 그 조사의 옵션이 아님) · 409 (같은 (옵션1, 옵션2) 조합이 이미 있음)
+- option2 의 용량 표기를 바꾸면 배송비 용량 계산(`utils/volume.py`, g = ml 로 읽음)도 그 문자열로 다시 계산된다.
 
 ### DELETE /price-surveys/{survey_id} — 가격 조사 삭제 (소프트)
 - 권한: `research`
