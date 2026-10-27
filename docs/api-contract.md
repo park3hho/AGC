@@ -925,6 +925,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 주문 응답에 `claim_reason` 추가.
 - 클레임이 새로 생기거나 바뀌면 OrderEvent `claim`.
 
+**주문 단계 `stage` 판정** (2026-10-27): 취소·반품(마켓 상태 또는 끝난 클레임) > 배송완료(`done`) > 배송중 또는 **살아 있는 타오바오 구매 기록**(취소·환불 상태 제외)이 있으면 `processing` > 그 외 `received`. 수집 · 타오바오 구매 등록·수정·삭제 때 다시 판정, 바뀌면 OrderEvent `stage` (data.stage {from,to} · reason).
+- 목록 항목에 `progress`: `{step 0~3, label, total 4}` — 타오바오 구매(ordered) / 판매처 발송(shipped) / 집운 입고(arrived 또는 집운 배송 요청) / 국제 발송(집운 출고 dispatched) 중 가장 앞선 칸. 구매·집운 기록이 없으면 null.
+
 **주문 금액 칸 `amount`** (2026-10-27, 목록·상세 모두 — 저장된 마켓 원본에서 계산, 새 호출 없음):
 `{"total", "discount", "discount_market", "discount_seller", "paid", "fee", "fee_detail": [{"label","amount"}], "fee_rate", "settlement", "estimated", "actual"}`
 - 네이버: total = totalProductAmount · discount = productDiscountAmount + deliveryDiscountAmount · discount_seller = sellerBurdenProductDiscountAmount + sellerBurdenStoreDiscountAmount · discount_market = discount − seller · paid = totalPaymentAmount · fee = paymentCommission + knowledgeShoppingSellingInterlockCommission (+ sale · channel) · settlement = expectedSettlementAmount (estimated false).
