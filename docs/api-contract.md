@@ -73,6 +73,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `photo_url` | | `http(s)://` 주소 또는 `POST /uploads/photos` 가 준 `/files/...` 경로, 1000자 이하 |
   | `title_cn` | ✅ | 1~300자 |
   | `title_ko` | | 300자 이하 |
+  | `photo_hover_url` | | 대표이미지(전환용) — 자사몰 상품 카드에 마우스를 올리면 바뀌는 두 번째 연출컷. 규칙은 `photo_url` 과 같음 (2026-10-27) |
   | `photos` | | 추가 사진(갤러리) 주소 목록 — 각 주소는 `photo_url` 과 같은 규칙, 같은 주소는 한 번, 최대 10장. 대표 사진(`photo_url`)은 넣지 않는다 (2026-10-25) |
   | `manufacturer` | | 제조사(공장 법인명), 300자 이하 (2026-10-27) |
   | `ingredients` | | 원재료, 5000자 이하. 맛마다 다르면 줄마다 `맛: 원재료` (2026-10-27) |
@@ -109,6 +110,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `title_cn` | 1~300자. `null`·빈 값 불가 |
   | `title_ko` | 300자 이하. `null` 이면 지움 |
   | `photo_url` | POST 와 같음. `null` 이면 지움 |
+  | `photo_hover_url` | POST 와 같음. `null` 이면 지움 |
   | `photos` | POST 와 같음. 보내면 목록 전체를 바꾼다 (순서 그대로). `[]` 이면 비움 |
   | `manufacturer` · `ingredients` · `allergens` · `shelf_life` · `storage` | POST 와 같음. `null`·빈 값이면 지움 |
 - Response 200: `{"status": "success", "product": Product}`
@@ -123,7 +125,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 **Product**
 ```json
 {
-  "id": 1, "code": "PR-261018-0001", "photo_url": null, "photos": [],
+  "id": 1, "code": "PR-261018-0001", "photo_url": null, "photo_hover_url": null, "photos": [],
   "title_cn": "无线蓝牙耳机", "title_ko": "무선 블루투스 이어폰",
   "manufacturer": null, "ingredients": null, "allergens": null, "shelf_life": null, "storage": null,
   "created_at": "2026-10-18T13:00:00+00:00", "updated_at": "2026-10-18T13:00:00+00:00"
