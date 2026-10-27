@@ -920,6 +920,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 **주문 응답 추가 칸** (2026-10-27): `claim_type` (CANCEL · ADMIN_CANCEL · RETURN · EXCHANGE · STOP_SHIPPING …) · `claim_status` (마켓 원래 값) · `claim_at`.
 - 네이버: 주문 응답의 `productOrder.claimType · claimStatus` (수집 때 같이).
 - 쿠팡: 수집 때 반품/취소 요청 목록 `GET /v6/vendors/{vendorId}/returnRequests` (timeFrame) — `cancelType=CANCEL` → CANCEL(단계도 취소) · `status=RU` → STOP_SHIPPING(출고중지 요청) · `status=UC` → RETURN.
+- 쿠팡 완료 (2026-10-27): `status=CC` 도 조회 — 판매자가 상품준비중에서 취소한 건은 여기로만 나온다 (receiptType=RETURN · RETURNS_COMPLETED). `returnItems.releaseStatus=S`(출고중지완료 = 출고 전) → CANCEL, 아니면 RETURN · 단계 취소. 사유 `claim_reason` (예: '판매자 취소 · 재고연동오류' — cancelReason 에 '파트너' 가 있으면 판매자 취소, cancelReasonCategory2), 원본 사유는 OrderEvent claim 의 data.detail.
+- 쿠팡 발주서 단건 조회가 400 "해당 주문이 취소 또는 반품되었습니다." 면 그 주문을 취소로 바꾸고 반품/취소 목록에서 사유를 채운다 (타오바오 구매 등록 직전 다시 보기 때).
+- 주문 응답에 `claim_reason` 추가.
 - 클레임이 새로 생기거나 바뀌면 OrderEvent `claim`.
 
 **주문 금액 칸 `amount`** (2026-10-27, 목록·상세 모두 — 저장된 마켓 원본에서 계산, 새 호출 없음):
