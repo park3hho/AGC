@@ -912,6 +912,18 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 타오바오에서 살 것. 판매자 코드 `PR-…-{옵션 id}[x{N}]` → 없으면 마켓 등록 기록(`market_listing.items`)의 마켓 옵션 id → 제품 코드만 있으면 제품까지.
 `{product_id, product_code, product_title, taobao_url, option_id, option1, option2, price_cny, bundle_qty, taobao_qty(= 주문 수량 × 묶음), matched_by(sku·listing·product_code)}` · 못 찾으면 `null`.
 타오바오 구매기록 추가 화면이 옵션 이름 · 개수 · 단가 · 상품 링크를 미리 채운다.
+#### GET /orders/updates — 새 주문·클레임 알림 (2026-10-27)
+- 권한: `order`. Query `after` (OrderEvent id). 없으면 기준만: `{"last_event_id": 76, "new_orders": [], "claims": []}`.
+- 있으면 그 뒤의 `collected`(새 주문) · `claim`(새 클레임·클레임 상태 변화) 기록 (최대 100): 항목 `{event_id, order_id, code, market, product_name, summary, at, auto}` — `auto` = 자동 수집(poller)으로 들어옴.
+- 주문 접수 화면이 자동 수집 주기마다 부른다 (화면 위 '알림' 섹션 + 화면이 안 보이면 브라우저 알림).
+
+**주문 응답 추가 칸** (2026-10-27): `claim_type` (CANCEL · ADMIN_CANCEL · RETURN · EXCHANGE · STOP_SHIPPING …) · `claim_status` (마켓 원래 값) · `claim_at`.
+- 네이버: 주문 응답의 `productOrder.claimType · claimStatus` (수집 때 같이).
+- 쿠팡: 수집 때 반품/취소 요청 목록 `GET /v6/vendors/{vendorId}/returnRequests` (timeFrame) — `cancelType=CANCEL` → CANCEL(단계도 취소) · `status=RU` → STOP_SHIPPING(출고중지 요청) · `status=UC` → RETURN.
+- 클레임이 새로 생기거나 바뀌면 OrderEvent `claim`.
+
+**수집 기록 이벤트의 실행 정보** (2026-10-27): `collected` · `changed` · `claim` 의 `data.run = {id, trigger, auto}` (OrderSyncRun id · manual/poller), 요약 끝에 '· 자동 수집' / '· 수동 수집'. `sync_run_id` 도 그대로.
+
 #### POST /orders/{id}/confirm — 발주확인 (2026-10-25)
 - 권한: `order`. 마켓에 '주문 확인'을 보낸다 → 고객 화면 결제완료 → **상품준비중** (즉시 취소가 막히고 취소 요청 → 판매자 승인으로 바뀜).
   - 쿠팡: `PUT /v2/providers/openapi/apis/api/v4/vendors/{vendorId}/ordersheets/acknowledgement` `{"vendorId", "shipmentBoxIds": [ship_unit_no]}` — `market_status = ACCEPT` 일 때만 (아니면 409 "먼저 다시 수집").
