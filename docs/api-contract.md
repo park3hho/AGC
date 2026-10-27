@@ -922,6 +922,13 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 쿠팡: 수집 때 반품/취소 요청 목록 `GET /v6/vendors/{vendorId}/returnRequests` (timeFrame) — `cancelType=CANCEL` → CANCEL(단계도 취소) · `status=RU` → STOP_SHIPPING(출고중지 요청) · `status=UC` → RETURN.
 - 클레임이 새로 생기거나 바뀌면 OrderEvent `claim`.
 
+**주문 금액 칸 `amount`** (2026-10-27, 목록·상세 모두 — 저장된 마켓 원본에서 계산, 새 호출 없음):
+`{"total", "discount", "discount_market", "discount_seller", "paid", "fee", "fee_detail": [{"label","amount"}], "fee_rate", "settlement", "estimated", "actual"}`
+- 네이버: total = totalProductAmount · discount = productDiscountAmount + deliveryDiscountAmount · discount_seller = sellerBurdenProductDiscountAmount + sellerBurdenStoreDiscountAmount · discount_market = discount − seller · paid = totalPaymentAmount · fee = paymentCommission + knowledgeShoppingSellingInterlockCommission (+ sale · channel) · settlement = expectedSettlementAmount (estimated false).
+- 쿠팡 (orderItems 중 이 줄의 vendorItemId): total = orderPrice · discount = discountPrice · discount_market = coupangDiscount · discount_seller = instantCouponDiscount + downloadableCouponDiscount · paid = total − discount · fee = round(total × 11.66%) (fee_rate, core/pricing_config 쿠팡 기본) · settlement = total − fee − seller (estimated true). 매출내역이 오면 settlement = 실제 정산액, actual true.
+- `settlement_date`: 쿠팡 매출내역의 정산일.
+- 쿠팡 실제 정산액: 수집 때 `GET /v2/providers/openapi/apis/api/v1/revenue-history` (recognitionDate 31일 · 어제까지, 자동 수집이면 6시간에 한 번) → `market_order.settlement_actual` + OrderEvent `settled`.
+
 **수집 기록 이벤트의 실행 정보** (2026-10-27): `collected` · `changed` · `claim` 의 `data.run = {id, trigger, auto}` (OrderSyncRun id · manual/poller), 요약 끝에 '· 자동 수집' / '· 수동 수집'. `sync_run_id` 도 그대로.
 
 #### POST /orders/{id}/confirm — 발주확인 (2026-10-25)
