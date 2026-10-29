@@ -355,168 +355,26 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 
 ---
 
-### GET /company-accounts — 회사 계정 목록
-타오바오·쿠팡·네이버·식품안전나라 등 회사가 쓰는 외부 서비스 계정. **목록에는 비밀번호가 없다.** 삭제한 계정은 나오지 않는다.
-- 권한: `account_view`
-- Query: `usage` (선택 — 이 용도가 붙은 계정만, 정확히 일치)
-- 정렬: 플랫폼 이름 순 → 최근 추가 순
-- Response 200: `{"status": "success", "items": [CompanyAccount]}`
+### 회사 정보 (회사 계정 · API 키 · 기본 정보) → HQ 로 옮김 (2026-10-30)
+`/company-accounts` · `/api-credentials` · `/company-info` 는 **없어졌다** (404). 정본은 **HQ** (화면 https://eido-hq.vercel.app, 설명서 `C:\Users\iwill\HQ\docs\svc-api.md`).
+- 사람은 HQ 화면에서 보고 고친다 (HQ 로그인 따로). AGC FE `/accounts/…` 는 HQ 안내 화면.
+- AGC BE 는 HQ `/svc` 를 서버끼리만 부른다 (`.env` `HQ_URL` · `HQ_SERVICE_KEY`, `services/hq_client.py`)
+  - 마켓·통관 키: `GET /api-credentials/by-code/{code}/values` — code `naver_commerce` · `coupang_openapi` · `unipass` (label 은 옛 AGC 와 같음)
+  - 상세페이지 S6 등록번호: `GET /company-info/by-link/food_agency_reg_no`
+  - 메모리 10분 보관, HQ 실패 시 마지막 값으로 계속 (5분 주문 수집이 멈추지 않게). 디스크·DB 사본 없음
 
-### POST /company-accounts — 회사 계정 추가
-- 권한: `account_edit`
-- Request
-  ```json
-  {"platform": "식품안전나라", "login_id": "agc01", "password": "********", "usages": ["인허가"], "url": "https://www.foodsafetykorea.go.kr"}
-  ```
-  | 필드 | 필수 | 규칙 |
-  |---|---|---|
-  | `platform` | ✅ | 1~100자, **자유 입력** (정해진 목록 없음. FE 제안 목록은 자동완성일 뿐) |
-  | `login_id` | ✅ | 1~200자 |
-  | `password` | ✅ | 1~500자. BE 가 암호화해서 저장 (응답·로그에 나오지 않음) |
-  | `usages` | | 문자열 배열, 각 1~30자, 최대 10개, 중복은 하나로 합침. 기본 `[]` |
-  | `memo` | | 비고 1000자 (예: 연동 휴대폰). 비우면 `null`. 비밀값은 넣지 않는다 (목록에 그대로 보인다) — 2026-10-25 |
-  | `url` | | 홈페이지. http/https 만, 500자 이하. `www.…` 처럼 주소만 보내면 `https://` 를 붙여 저장. 빈 값·`null` = 없음 |
-- Response 200: `{"status": "success", "account": CompanyAccount}` · 422 (주소 형식 오류 등)
-
-### GET /company-accounts/{account_id} — 회사 계정 한 건 (수정 화면용)
-- 권한: `account_view`
-- Response 200: `{"status": "success", "account": CompanyAccount}` · 404 (없거나 삭제됨)
-
-### PATCH /company-accounts/{account_id} — 회사 계정 수정
-보낸 필드만 바꾼다.
-- 권한: `account_edit`
-- Request: POST 와 같은 필드, 전부 선택. `password` 는 **보냈을 때만** 새로 암호화해 바꾼다 (안 보내면 그대로). `url` · `memo` 에 `null`·`""` 을 보내면 지운다. `platform`·`login_id`·`usages` 에 `null` 은 422.
-- Response 200: `{"status": "success", "account": CompanyAccount}` · 400 (바꿀 필드 없음) · 404
-
-### DELETE /company-accounts/{account_id} — 회사 계정 삭제 (소프트)
-목록·열람·수정에서 사라진다. 비밀번호 열람 기록을 남기려고 행은 지우지 않는다 (`deleted_at`).
-- 권한: `account_edit`
-- Response 200: `{"status": "success"}` · 404 (없거나 이미 삭제됨)
-
-### GET /company-accounts/{account_id}/password — 비밀번호 보기
-한 건씩만 복호화해서 준다. **부를 때마다 열람 기록**(누가·언제·어느 계정·IP)이 남는다.
-- 권한: `account_view`
-- Response 200: `{"status": "success", "password": "..."}`
-- Response 404 (없거나 삭제됨)
-
-**CompanyAccount**
+### GET /company-reminders — 홈 할 일용 만료·재인증 날짜 (2026-10-30)
+- 권한: 로그인
+- HQ 목록(AGC 에 공유된 것)에서 날짜만 — 비밀값·값·파일 없음
+- Response 200:
 ```json
-{
-  "id": 1, "platform": "식품안전나라", "login_id": "agc01", "usages": ["인허가"], "memo": null,
-  "url": "https://www.foodsafetykorea.go.kr",
-  "created_at": "2026-10-18T13:00:00+00:00", "updated_at": "2026-10-18T13:00:00+00:00"
-}
+{"status": "success", "hq_url": "https://eido-hq.vercel.app", "ok": true,
+ "api_credentials": [{"id": 1, "service": "네이버 커머스API", "expires_on": null, "reauth_from": "2027-02-27", "reauth_to": "2027-03-12"}],
+ "company_info": [{"id": 6, "category": "서류", "name": "국세 납세증명서", "expires_on": "2026-10-25", "remind": false}]}
 ```
-- `url` 은 없으면 `null`.
+- `ok: false` = HQ 에 못 닿음 (마지막 값도 없으면 빈 목록)
 
-### API 키 (`/api-credentials`) — 2026-10-21
-로그인 계정(`/company-accounts`)과 따로 둔다. 외부 API 키 묶음 — 공개값(앱 ID·업체코드 등)은 그대로 주고, **비밀값은 이름만** 준다. 값은 한 개씩 열람 API 로만 받고 열람 기록이 남는다. 권한은 회사 계정과 같다 (보기·열람 `account_view`, 추가·수정·삭제 `account_edit`).
-
-| Method | Path | 설명 |
-|---|---|---|
-| GET | `/api-credentials` | 목록 (서비스 이름 순). `{"items": [ApiCredential]}` |
-| POST | `/api-credentials` | 추가. `{"credential": ApiCredential}` |
-| GET | `/api-credentials/{id}` | 한 건 (수정 화면용) · 404 |
-| PATCH | `/api-credentials/{id}` | 수정 — 보낸 필드만. 400 (바꿀 것 없음 · 값 없는 새 비밀값) · 404 |
-| DELETE | `/api-credentials/{id}` | 삭제 (소프트 — 열람 기록 보존) · 404 |
-| GET | `/api-credentials/{id}/secrets/{secret_id}` | 비밀값 한 개 보기 `{"value": "..."}` — **부를 때마다 열람 기록** · 404 |
-
-**Request (POST)**
-```json
-{
-  "service": "쿠팡 OpenAPI", "url": "https://wing.coupang.com",
-  "public_values": [{"label": "업체코드 (vendorId)", "value": "A0000000"}],
-  "secrets": [{"label": "Access Key", "value": "..."}, {"label": "Secret Key", "value": "..."}],
-  "issued_on": "2026-09-21", "expires_on": "2027-03-20",
-  "reauth_from": null, "reauth_to": null,
-  "allowed_ips": ["180.231.169.53"], "memo": "..."
-}
-```
-| 필드 | 필수 | 규칙 |
-|---|---|---|
-| `service` | ✅ | 1~100자, 자유 입력 |
-| `secrets` | ✅ | 1~10개, `label` 1~50자 겹치지 않게, `value` 1~2000자 (BE 가 암호화) |
-| `public_values` | | 0~10개, `label`·`value` 모두 필수, `label` 겹치지 않게 |
-| `url` | | 회사 계정 `url` 과 같은 규칙 |
-| `issued_on` · `expires_on` | | 날짜. 발급일 > 만료일이면 422 |
-| `reauth_from` · `reauth_to` | | 재인증 기간 (예: 네이버 커머스API 앱 인증). 시작 > 끝이면 422 |
-| `allowed_ips` | | IP 또는 CIDR, 최대 20개 |
-| `memo` | | 2000자 이하 |
-
-- **PATCH 의 `secrets`**: 보내면 그 목록으로 통째로 바꾼다. `value` 를 비운(`null`·`""`) 항목은 **같은 `label` 의 기존 값을 그대로** 쓴다 (열람 기록도 이어짐). 기존에 없던 `label` 인데 값이 없으면 400. 목록에서 빠진 비밀값은 지워진다.
-
-**ApiCredential**
-```json
-{
-  "id": 2, "service": "쿠팡 OpenAPI", "url": "https://wing.coupang.com",
-  "public_values": [{"label": "업체코드 (vendorId)", "value": "A0000000"}],
-  "secrets": [{"id": 3, "label": "Access Key"}, {"id": 4, "label": "Secret Key"}],
-  "issued_on": "2026-09-21", "expires_on": "2027-03-20", "reauth_from": null, "reauth_to": null,
-  "allowed_ips": ["180.231.169.53"], "memo": "...",
-  "created_at": "...", "updated_at": "..."
-}
-```
-- 만료·재인증 알림(D-30 주의, D-14 위험)은 FE `utils/apiKey.keyStatuses` 가 계산한다.
-
-### 회사 정보 › 기본 정보 (`/company-info`) — 2026-10-23
-회사 정보 = 기본 정보 · 로그인 계정(`/company-accounts`) · API 키(`/api-credentials`). **기본 정보는 로그인도 비밀값도 아닌 회사 정보 전부** — 사업자등록번호, 인허가·신고 번호, 계좌, 연락처, 서류. 값은 숨기지 않고(열람 기록 없음) 그대로 준다. 만료일이 있어도 API 키가 아니다 (개념으로 나눈다: 비밀값·재인증·허용 IP 가 있으면 API 키). 권한: 보기·파일 받기 `account_view`, 추가·수정·삭제·파일 올리기 `account_edit`.
-
-| Method | Path | 설명 |
-|---|---|---|
-| GET | `/company-info` | 목록 `{"items": [CompanyInfo], "links": [Link]}` — 분류 → `sort` → id 순 |
-| POST | `/company-info` | 추가 `{"item": CompanyInfo}` · 409 (같은 `link` 이미 있음) |
-| GET | `/company-info/{id}` | 한 건 (수정 화면용) · 404 |
-| PATCH | `/company-info/{id}` | 수정 — 보낸 필드만 · 400 (바꿀 것 없음) · 404 · 409 |
-| DELETE | `/company-info/{id}` | 삭제 (소프트, 파일도 같이 숨김) · 404 |
-| POST | `/company-info/{id}/files` | 서류 파일 올리기 (multipart `file`) `{"file": InfoFile}` — PDF·JPG·PNG·WEBP, 20MB, 항목당 10개 · 413 · 415 |
-| GET | `/company-info/{id}/files/{file_id}` | 파일 보기 (브라우저에서 바로 열림). **`/files/...` 공개 주소가 아니다** — 로그인 쿠키 필요 · 404 |
-| DELETE | `/company-info/{id}/files/{file_id}` | 파일 삭제 · 404 |
-
-**Request (POST)**
-```json
-{
-  "category": "인허가·신고", "name": "전자상거래업자부호", "value": "K-26-043299",
-  "details": [{"label": "발급처", "value": "유니패스"}],
-  "issuer": "관세청", "issued_on": null, "expires_on": "2029-10-13", "remind": true,
-  "url": "https://unipass.customs.go.kr", "link": "ecommerce_code", "sort": 30, "memo": "유효 3년"
-}
-```
-| 필드 | 필수 | 규칙 |
-|---|---|---|
-| `category` | ✅ | 1~30자, 자유 입력 (FE 추천: 사업자 · 인허가·신고 · 계좌 · 연락처 · 서류) |
-| `name` | ✅ | 1~100자 |
-| `value` | | 대표 값 (번호·계좌번호 등) 500자 이하. 서류처럼 파일만 있는 항목은 비움 |
-| `details` | | 세부 값 0~20개 `{label, value}` (은행·예금주·상호 등), `label` 겹치지 않게 |
-| `issuer` | | 발급기관 100자 이하 |
-| `issued_on` · `expires_on` | | 날짜. 발급일 > 만료일이면 422 |
-| `remind` | | 기본 `true`. 만료가 가까우면 홈 할 일에 띄울지 (납세증명서처럼 필요할 때 다시 떼는 서류는 `false`) |
-| `url` | | 회사 계정 `url` 과 같은 규칙 |
-| `link` | | 앱에서 이 값을 가져다 쓰는 곳. `links` 의 `key` 중 하나 또는 `null`. 항목 하나에만 붙는다 (걸려 있으면 409) |
-| `sort` | | 분류 안 순서 (작을수록 위), 기본 0 |
-| `memo` | | 2000자 이하 |
-
-**CompanyInfo**
-```json
-{
-  "id": 5, "category": "인허가·신고", "name": "전자상거래업자부호", "value": "K-26-043299",
-  "details": [], "issuer": "관세청", "issued_on": null, "expires_on": "2029-10-13", "remind": true,
-  "url": "https://unipass.customs.go.kr", "link": "ecommerce_code", "sort": 30, "memo": "유효 3년",
-  "files": [{"id": 9, "name": "전자상거래부호 캡쳐.png", "size": 48213, "content_type": "image/png", "created_at": "..."}],
-  "created_at": "...", "updated_at": "..."
-}
-```
-**Link** — `{"key": "food_agency_reg_no", "label": "수입식품등 인터넷구매대행업 영업등록번호", "used_by": "상세페이지 S6 등록번호"}`
-
-| `link` | 쓰는 곳 |
-|---|---|
-| `biz_reg_no` | 사업자등록번호 — 상품 등록(예정) |
-| `mail_order_no` | 통신판매업 신고번호 — 상품 등록(예정) |
-| `food_agency_reg_no` | 구매대행업 영업등록번호 — **상세페이지 S6 등록번호** (`GET /detail-pages/common` 의 `reg_no` 가 이 값을 쓴다) |
-| `ecommerce_code` | 전자상거래업자부호 — 통관(예정) |
-
-- 만료 배지는 API 키와 같은 기준(D-30 주의, D-14 위험)으로 FE `utils/companyInfo.infoStatus` 가 계산한다. 홈 할 일에는 `remind: true` 인 것만.
-- 파일은 공개 폴더(`/files`)가 아닌 `PRIVATE_DIR` 에 저장한다 (주민번호·계좌가 든 서류).
-
+---
 ### 출고지·반품지 주소록 (`/shipping-addresses`) — 2026-10-22
 실제 장소 1곳 = 1행. 마켓(네이버·쿠팡) 주소록에서 받은 번호를 `market_codes` 에 묶는다. **상품 등록은 기본 출고지·기본 반품지의 마켓 번호를 쓴다.** 구매대행은 출고지가 해외(배대지)여야 한다 — 쿠팡 '구매대행' 배송, 네이버 해외직구 표시 · 개인통관고유부호 입력창 모두 해외 출고지 기준. 권한: 보기 `research`, 추가·수정·삭제 `account_edit`.
 
