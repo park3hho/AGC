@@ -1003,17 +1003,3 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | GET · PATCH · DELETE | `/jiyun-shipments/{id}` | 조회 · 보낸 필드만 수정 · 소프트 삭제 (기록은 남음) |
 
 칸: `status`(requested 배송 요청 · dispatched 출고 · problem · cancelled — 출고로 바꾸고 출고 시각이 비면 지금) · `packages`(묶인 중국 운송장) · `weight_kg` · `fee_cny` · `transport`(sea·air) · `requested_at` · 실제 결제 `pay_method`·`pay_currency`·`pay_amount`·`charged_krw`·`charged_status`(none 미확인·approved·settled)·`charged_at`·`charged_source` (타오바오 구매기록과 같은 규칙) · `dispatched_at` · `hbl`(통관 조회 번호) · `kr_courier`(`core/shipping_config.COURIERS` 키) · `kr_tracking_no`(마켓 발송처리용) · `memo`.
-
-## 내부 API — 회사 정보 중앙화 (2026-10-29)
-
-FIN · MKT · SHOP 서버 전용. 밖(api.eidofood.com)에서는 404. 호출: `http://agc_app:8000/internal/company/...`, 헤더 `X-API-Key: <AGC_SERVICE_KEY>`.
-
-| 메서드 · 경로 | 응답 |
-|---|---|
-| GET /internal/company/accounts | `{status, service, items: [회사 계정 (비밀번호 없음, shared_with 포함)]}` |
-| GET /internal/company/accounts/{id}/password | `{status, password}` — 열람 기록 |
-| GET /internal/company/api-credentials | `{status, service, items: [API 키 (secrets 는 {id,label})]}` |
-| GET /internal/company/api-credentials/{id}/values | `{status, credential: {id, service, public: {label: value}, secrets: {label: value}, expires_on}}` — 비밀값마다 열람 기록 |
-
-오류: 키 없음·틀림 401, 서비스 키 아님 403, 공유 안 된 행 404.
-회사 계정 · API 키 응답에 `shared_with: string[]` 추가 (POST · PATCH 에서도 받음, 값은 fin · mkt · shop).
