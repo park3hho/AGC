@@ -80,6 +80,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `allergens` | | 알레르기 유발 성분 (예: `우유, 대두`), 300자 이하 (2026-10-27) |
   | `shelf_life` | | 소비기한 (예: `12개월`), 100자 이하 (2026-10-27) |
   | `storage` | | 보관 방법, 300자 이하 (2026-10-27) |
+  | `category` | | 대분류 `beverage`(음료, 따서 바로 마시는 완제품) · `tea`(차, 우려 마시는 찻잎·티백). 안 보내면 `beverage` (2026-10-29) |
+  | `subcategory` | | 소분류 — 대분류마다 정해진 값 (`GET /products/categories`). 보낼 때는 `category` 와 같이 |
+  | `tea_form` | | 차 형태 — `tea` 만: `leaf` 찻잎 · `bag` 티백 · `coldbrew` 냉침 티백 · `powder` 가루 |
   - 제품 정보 5개는 리서치 때 함께 찾아 넣는다. 상세페이지 초안(`build_template`)이 이 값으로 '제품 정보' 표를 채우고, 빈 값만 `[[...]]` 확인 표시로 남는다.
 - Response 200: `{"status": "success", "product": Product}`
 - Response 409: 코드 발급 충돌 (드묾 — 다시 시도)
@@ -88,9 +91,16 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - 권한: 로그인
 - Response 200: `{"status": "success", "code": "PR-261018-0001"}`
 
+### GET /products/categories — 분류 코드와 이름 (2026-10-29)
+- 권한: 로그인
+- Response 200: `{"status": "success", "categories": {"beverage": {"label": "음료", "sub": {"soda": "탄산", …}}, "tea": {"label": "차", "sub": {…}, "forms": {"leaf": "찻잎", …}}}}`. 원본은 BE `utils/category.py` — 자사몰 메뉴도 이 값을 쓴다
+- 음료 소분류: `soda` 탄산 · `juice` 주스 · `tea` 차음료 · `milktea` 밀크티 · `coffee` 커피 · `milk` 우유·두유 · `functional` 이온·기능성 · `traditional` 전통음료
+- 차 소분류: `green` 녹차 · `black` 홍차 · `oolong` 우롱·암차 · `white` 백차 · `puer` 보이·흑차 · `flower` 꽃차 · `blend` 블렌드·과일차
+- 경계: 탄산 차·요구르트맛 탄산 = `soda`, 과즙차 = `tea`, 코코넛워터 = `functional`, 코코넛밀크·유산균 음료 = `milk`, 꿀레몬수·식초 음료·옥수수 주스 = `juice`, 쏸메이탕·녹두탕·크바스 = `traditional`
+
 ### GET /products — 제품 목록
 - 권한: 로그인
-- Query: `q` (제품 코드·중국어 제목·한국어 제목 부분 검색), `page`, `size`
+- Query: `q` (제품 코드·중국어 제목·한국어 제목 부분 검색), `page`, `size`, `category`, `subcategory` (`none` = 소분류 안 정한 것)
 - 정렬: 최근 추가 순
 - Response 200: `{"status": "success", "items": [Product + "survey_count" + "latest_survey" + "priced_platforms"], "total": 12, "page": 1, "size": 20}`
   - `latest_survey`: 최근 가격 조사 요약 `{"id", "code", "survey_date", "option_count", "min_price_cny": "39.90"}` · 조사가 없으면 `null`
@@ -113,6 +123,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `photo_hover_url` | POST 와 같음. `null` 이면 지움 |
   | `photos` | POST 와 같음. 보내면 목록 전체를 바꾼다 (순서 그대로). `[]` 이면 비움 |
   | `manufacturer` · `ingredients` · `allergens` · `shelf_life` · `storage` | POST 와 같음. `null`·빈 값이면 지움 |
+  | `category` · `subcategory` · `tea_form` | POST 와 같음. `subcategory` 만 보내면 400 (`category` 와 같이) |
 - Response 200: `{"status": "success", "product": Product}`
 - Response 400: 바꿀 필드가 없음 · 404 (없거나 삭제됨)
 
