@@ -693,7 +693,13 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   {
     "status": "success",
     "fx": FxRate,
-    "rule": {"service": "타오바오 집운-해운", "category": "식품", "first_kg": "1.0", "first_cny": "33.00", "step_kg": "0.5", "step_cny": "2.00", "max_kg": "30.0", "box_weight_g": 500},
+    "rule": {"service": "타오바오 집운-해운", "category": "식품", "first_kg": "1.0", "first_cny": "33.00", "step_kg": "0.5", "step_cny": "2.00", "max_kg": "30.0", "box_weight_g": 500,
+             "eta": "합포장 후 6~7일 도착 …",
+             "rates": [{"name": "식품 소형", "cn": "食品敏货", "range": "0~30kg", "price": "첫 1kg ¥33 · 0.5kg마다 ¥2", "applied": true}],
+             "billable_rule": "실제 무게와 부피 무게 중 큰 값", "rounding": ["…"], "size_limits": ["…"],
+             "tax_note": "…", "notes": ["…"],
+             "volumetric": {"divisor": 6000, "applies_to": "tea", "box_cm": [30, 20, 15], "box_weight_g": 1500, "source_url": "…", "source_note": "…"},
+             "source_url": "https://world.taobao.com/wow/z/oversea/rule-guide/hFXyydtteWSdFtTPjENn", "source_checked": "2026-10-29"},
     "brackets": [
       {"billable_kg": "1.0", "max_volume_ml": 500, "shipping_cny": "33.00"},
       {"billable_kg": "1.5", "max_volume_ml": 1000, "shipping_cny": "35.00"}
@@ -736,7 +742,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   - `shipping_cny` = 33 + (`billable_kg` − 1) ÷ 0.5 × 2 (위안)
   - `over_limit` = `billable_kg` 가 30kg 초과 (소형 한도 — 이 요금표로 못 보냄)
 - 용량을 못 읽으면 `volume_ml` · `weight_g` · `billable_kg` · `shipping_cny` 가 `null` → 옵션 이름에 `245ml×24` 나 `205g×10` 처럼 적어야 계산된다.
-- 부피 무게 · 관세는 반영하지 않는다.
+- 관세는 반영하지 않는다.
+- 부피 무게 (2026-10-29): 대분류 `tea`(차) 제품만 계산 무게 = max(`weight_g`, `dim_weight_g`). `dim_weight_g` = 상자 30×20×15cm ÷ 6000 × 묶음 수 (상자 크기는 상세에 없어서 보수적으로 잡음). 차는 용량을 못 읽어도 부피 무게로 계산된다. 음료는 `dim_weight_g: null`.
+- `rule` 의 `eta`·`rates`·`rounding`·`size_limits`·`tax_note`·`notes`·`source_*` 는 타오바오 공식 집운 안내(2026-10-29 확인) 표시용이다. 계산은 `applied: true` 요율(식품 소형)만 쓴다.
 ---
 
 ## 상세페이지 (디자인) · 휴먼 체크 — 2026-10-21
