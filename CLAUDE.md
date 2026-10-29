@@ -39,3 +39,6 @@
   - 내가 바꾼 파일만 커밋한다 (다른 사람·에이전트의 미커밋 작업은 건드리지 않는다).
   - 작성자: `git -c user.name=park3hho -c user.email=ejfhr7777@gmail.com commit ...` · 메시지: `feat: 한국어 요약` 형식.
   - FE 는 푸시하면 Vercel 에 바로 배포된다. 푸시가 막히면(네트워크·권한) 커밋까지 하고 사용자에게 바로 알린다.
+
+## 브랜드 아이콘
+- EIDO 회사 아이콘·로고·파비콘 원본은 `C:\Users\iwill\Eido\Brand\icon` (README.md 에 용도·쓰는 법). 기본은 한글 '이도' 붓글씨. 새로 만들지 말고 여기 것을 쓴다 (2026-10-29).
