@@ -228,6 +228,12 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - Response 400 (바꿀 필드 없음) · 404 (조사 또는 그 조사의 옵션이 아님) · 409 (같은 (옵션1, 옵션2) 조합이 이미 있음)
 - option2 의 용량 표기를 바꾸면 배송비 용량 계산(`utils/volume.py`, g = ml 로 읽음)도 그 문자열로 다시 계산된다.
 
+### DELETE /price-surveys/{survey_id}/options/{option_id} — 옵션 1개 삭제 (2026-10-30)
+중복 옵션 정리용. 다른 옵션의 `id`·판매가는 그대로. 지운 옵션의 판매가(OptionPrice)는 함께 지워지고 대표 옵션 지정(base_option)은 비워진다.
+- 권한: `research`
+- Response 200: `{"status": "success", "price_survey": PriceSurvey}`
+- Response 404 (조사 또는 그 조사의 옵션이 아님) · 409 (마지막 옵션 · 살아 있는 마켓 등록 `items[].option_id` 가 이 옵션을 씀 — 먼저 마켓에서 내리고 등록 기록을 지운다)
+
 ### DELETE /price-surveys/{survey_id} — 가격 조사 삭제 (소프트)
 - 권한: `research`
 - Response 200: `{"status": "success"}`
