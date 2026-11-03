@@ -875,3 +875,24 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | GET · PATCH · DELETE | `/jiyun-shipments/{id}` | 조회 · 보낸 필드만 수정 · 소프트 삭제 (기록은 남음) |
 
 칸: `status`(requested 배송 요청 · dispatched 출고 · problem · cancelled — 출고로 바꾸고 출고 시각이 비면 지금) · `packages`(묶인 중국 운송장) · `weight_kg` · `fee_cny` · `transport`(sea·air) · `requested_at` · 실제 결제 `pay_method`·`pay_currency`·`pay_amount`·`charged_krw`·`charged_status`(none 미확인·approved·settled)·`charged_at`·`charged_source` (타오바오 구매기록과 같은 규칙) · `dispatched_at` · `hbl`(통관 조회 번호) · `kr_courier`(`core/shipping_config.COURIERS` 키) · `kr_tracking_no`(마켓 발송처리용) · `memo`.
+
+### 국내 배송 기록 (`/domestic-shipments`) — 2026-11-03
+
+국내 택배 송장 1개 = 1건, 고객 주문 1건에 붙는다. 타오바오 구매기록 → 집운 기록 → **국내 배송 기록**. 권한 `order`. 화면: 판매 › 국내 배송 기록 (`/domestic`, 개발자 모드).
+
+- **자동 생성**: 집운 기록에 `kr_tracking_no` 가 들어가면 (`source=jiyun`), 마켓 원본(네이버 `delivery.trackingNumber` · 쿠팡 `invoiceNumber`)에 송장이 보이면 (`source=market`). 지운 송장은 다시 만들지 않는다.
+- **자동 갱신**: 주문 자동 수집(5분) 끝에 `refresh_domestic` — 마켓 발송처리(`market_courier` · `market_tracking_no` · `market_sent_at` · `market_wrong`), 배송 조회 tracker.delivery (`core/shipping_config.COURIERS[*].tracker`, 송장마다 30분에 한 번, 배송 완료 · 30일 지나면 그만).
+- **상태** (`core/domestic_config.DOMESTIC_STATUS`): 배송 완료 > 배송 중(조회 단계 있음) > 마켓 발송처리 > 송장 나옴. `problem` · `cancelled` 는 사람이 정하고 자동 갱신이 덮지 않는다. PATCH 로 그 밖의 값을 보내면 자동 판정으로 돌아간다.
+- **추적 기록**: OrderEvent `domestic_created` · `domestic_changed` · `domestic_deleted` (data.domestic_id, step `국내 배송`). 배송 조회 단계 자체는 남기지 않는다.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/domestic-shipments?order_id=&status=&q=&limit=` | 목록 (`items`, `status`) — q 는 송장 |
+| POST | `/domestic-shipments` | 직접 추가 `{order_id, courier?, tracking_no, memo?}` · 같은 주문 같은 송장 409 |
+| GET | `/domestic-shipments/{id}` | 1건 (`domestic`) |
+| PATCH | `/domestic-shipments/{id}` | `{courier?, tracking_no?, status?, memo?}` — 송장 · 택배사를 바꾸면 조회를 처음부터 |
+| POST | `/domestic-shipments/{id}/refresh` | 지금 마켓 발송처리 · 배송 조회 |
+| DELETE | `/domestic-shipments/{id}` | 소프트 삭제 (추적 기록은 남음) |
+
+응답 `domestic`: `id, order{id, code, market, order_no, market_status, product_name, option_name, quantity}, jiyun_id, courier, courier_name, tracking_no, tracking_url, status, source, source_label, market_courier, market_courier_name, market_tracking_no, market_sent_at, market_wrong, market_match, track_state, track_state_id, track_location, track_last_at, track_events[{time, status, status_id, location, description}], track_error, tracked_at, delivered_at, memo, created_at, updated_at`
+
