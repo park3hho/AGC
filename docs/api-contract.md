@@ -896,3 +896,13 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 
 응답 `domestic`: `id, order{id, code, market, order_no, market_status, product_name, option_name, quantity}, jiyun_id, courier, courier_name, tracking_no, tracking_url, status, source, source_label, market_courier, market_courier_name, market_tracking_no, market_sent_at, market_wrong, market_match, track_state, track_state_id, track_location, track_last_at, track_events[{time, status, status_id, location, description}], track_error, tracked_at, delivered_at, memo, created_at, updated_at`
 
+
+### 자사몰 분석 (`/shop-analytics`) — 2026-11-15
+
+자사몰(eidofood.com) 방문 기록 + 결제 주문. 권한 `order`. 화면: 판매 › 자사몰 분석 (`/shop-analytics`).
+- 방문 기록: SHOP-FE `src/lib/track.js` → SHOP-BE `POST /shop/track` → `shop.shop_event` (page_view · product_view · add_to_cart · begin_checkout · purchase). 봇 버림, IP 는 날짜별 소금 해시 16자만, 방문자 id 는 브라우저 무작위 값.
+- 주문·매출은 `shop.shop_order` (status=paid, test=false) 가 원본.
+
+| 메서드 | 경로 | 설명 |
+| --- | --- | --- |
+| GET | `/shop-analytics?from=&to=` | KST 날짜 (없으면 최근 7일). 응답 `range, live(30분), total{visitors, sessions, views, views_per_session, bounce_pct, median_sec, orders, revenue, conversion_pct}, funnel[{key,label,sessions}], days[{date,visitors,views,orders,revenue}], sources[{name,sessions,visitors,carts,orders}], pages[{name,views}], products[{code,name,views,carts}], devices[{name,visitors}], browsers[...], tracking_since` |
