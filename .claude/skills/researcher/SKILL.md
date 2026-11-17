@@ -272,7 +272,7 @@ POST /uploads/photos/from-url   {"url": "https://img.alicdn.com/...jpg"}
 
 1. 사람이 FE 에서 제품을 고르듯, §3 의 `product_code` 를 쓴다.
 2. `POST /price-surveys` 로 조사 1건 + 옵션 전체를 한 번에 넣는다.
-3. 고칠 게 있으면 `PATCH /price-surveys/{id}` (`options` 를 보내면 옵션 전체 교체). `survey_date`·제품은 못 바꾸므로 그럴 땐 `DELETE` 후 다시 등록.
+3. 고칠 게 있으면 `PATCH /price-surveys/{id}` (`options` 를 보내면 그 목록으로 맞춤 — 같은 (옵션1, 옵션2)는 옵션 id 가 그대로, 빠진 옵션만 지워짐, 마켓 등록에 쓰이는 옵션이 빠지면 409. 이름만 고칠 땐 `PATCH /price-surveys/{id}/options/{option_id}`). 같은 제품을 다시 조사해도 옵션 이름이 같으면 옵션 id 가 그대로라 판매가·마켓 연결이 유지된다 (2026-11-18). `survey_date`·제품은 못 바꾸므로 그럴 땐 `DELETE` 후 다시 등록.
 
 ---
 
