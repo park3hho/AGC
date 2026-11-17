@@ -200,7 +200,7 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - Response 404 (없거나 삭제됨, 제품이 삭제된 경우 포함)
 
 ### PATCH /price-surveys/{survey_id} — 가격 조사 수정
-보낸 필드만 바꾼다. `options` 를 보내면 **옵션 목록 전체를 그 내용으로 바꾼다** (부분 수정 아님 — 옵션 `id` 가 새로 바뀐다).
+보낸 필드만 바꾼다. `options` 를 보내면 **이 조사의 옵션 목록을 그 내용으로 맞춘다** — 같은 (옵션1, 옵션2)(공백·대소문자 무시)는 옵션 `id` 를 **그대로** 두고 가격·표기만 고친다 (2026-11-18 옵션 구조 정규화).
 조사 코드번호가 조사일 기준이라 `survey_date` 와 `product_code` 는 바꿀 수 없다 → 잘못 넣었으면 삭제 후 다시 등록.
 - 권한: `research`
 - Request: `{"coupang_min_price": 18900}` · `{"options": [...]}` (섞어도 됨)
@@ -211,7 +211,8 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `options` | POST 와 같음 (1개 이상, 중복 불가) |
 - Response 200: `{"status": "success", "price_survey": PriceSurvey}`
 - Response 400: 바꿀 필드가 없음 · 404 (없거나 삭제됨)
-- ⚠️ **`options` 를 보내면 옵션 행을 지우고 새 id 로 다시 만든다.** 그 옵션에 저장된 판매가(`option_price`)가 CASCADE 로 함께 지워지고, 마켓 등록(listing `items[].option_id`)과의 연결도 끊긴다 (2026-10-25 사고: 판매가 5개 제품 삭제 후 재계산 복구). 이름·사진만 고칠 때는 아래 옵션 단건 수정을 쓴다.
+- `options` 에서 **빠진 옵션만** 지운다 (소프트 삭제 + 그 옵션 판매가 삭제). 빠진 옵션을 살아 있는 마켓 등록(`items[].option_id`)이 쓰면 **409** — 이름을 바꾸려던 거라면 아래 옵션 단건 수정을 쓴다. 새 조합만 새 `id` 를 받는다.
+- (예전 2026-10-25 사고: 옵션 전체를 지우고 새 id 로 만들던 때 판매가 5개 제품이 지워졌다 — 2026-11-18 부터 id 를 다시 만들지 않는다.)
 
 ### PATCH /price-surveys/{survey_id}/options/{option_id} — 옵션 1개 제자리 수정
 옵션 `id` 와 `price_cny` 는 그대로 두고 이름·사진만 바꾼다 → 저장된 판매가와 마켓 등록 연결이 유지된다. (2026-10-26)
@@ -229,12 +230,13 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 - option2 의 용량 표기를 바꾸면 배송비 용량 계산(`utils/volume.py`, g = ml 로 읽음)도 그 문자열로 다시 계산된다.
 
 ### DELETE /price-surveys/{survey_id}/options/{option_id} — 옵션 1개 삭제 (2026-10-30)
-중복 옵션 정리용. 다른 옵션의 `id`·판매가는 그대로. 지운 옵션의 판매가(OptionPrice)는 함께 지워지고 대표 옵션 지정(base_option)은 비워진다.
+중복 옵션 정리용. **소프트 삭제** (2026-11-18) — 옵션 `id` 는 남아 옛 주문 SKU 를 계속 찾고, 같은 이름으로 다시 넣으면 그 `id` 가 살아난다. 다른 옵션의 `id`·판매가는 그대로. 지운 옵션의 판매가(OptionPrice)는 함께 지워지고 대표 옵션 지정(base_option)은 비워지며 묶음 채택도 풀린다.
 - 권한: `research`
 - Response 200: `{"status": "success", "price_survey": PriceSurvey}`
 - Response 404 (조사 또는 그 조사의 옵션이 아님) · 409 (마지막 옵션 · 살아 있는 마켓 등록 `items[].option_id` 가 이 옵션을 씀 — 먼저 마켓에서 내리고 등록 기록을 지운다)
 
 ### DELETE /price-surveys/{survey_id} — 가격 조사 삭제 (소프트)
+옵션(`id`)·판매가는 그대로. 현재 원가(`options[].price_cny`)만 남은 조사 중 최근 조사 값으로 다시 맞춘다 (2026-11-18).
 - 권한: `research`
 - Response 200: `{"status": "success"}`
 - Response 404 (없거나 이미 삭제됨)
@@ -455,13 +457,14 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   ```
 - Response 404 (제품이 없거나 삭제됨)
 
-- **묶음 판매 (2026-10-26)** — 판매 옵션 = 조사 옵션 × 묶음 수(`bundle_qty`). 묶음 1 = 조사 옵션 그대로 (`option_prices`, 지금까지와 같음).
+- **옵션 = 제품 옵션 (2026-11-18)** — `options[].id` 는 제품 단위로 고정된 옵션 id (`product_option`). 가격 조사를 새로 해도 같은 (옵션1, 옵션2)면 id 가 그대로라 판매가·묶음·마켓 SKU 가 끊기지 않는다. `options[].price_cny` = 현재 원가 (최근 조사 값). 응답 모양은 예전과 같다.
+- **묶음 판매 (2026-10-26)** — 판매 옵션 = 제품 옵션 × 묶음 수(`bundle_qty`). 묶음 1 = 옵션 그대로 (`option_prices`, 지금까지와 같음).
   - 응답 `bundles`: 묶음 판매 옵션 = **10kg 제안**(`suggested`) + 어느 판매처든 판매가가 저장된 묶음(`saved`). 각 줄은 옵션 모양(`price_cny` · `volume_ml` · `weight_g` · `billable_kg` · `shipping_cny` · `over_limit` 모두 **묶음 전체 기준**, 박스 1개) +
     `key`("66x2") · `option_id` · `bundle_qty` · `market_option1`/`market_option2`(마켓에 올릴 이름, 개수 N배 "330ml×48캔") · `pack_note`("24캔×2") · `total_count`(48) · `over_duty_free`(상품가 > $150, 위안→달러 7.1 근사) · `sku`(`PR-…-66x2`).
   - 제안 규칙 (`core/shipping_config` 묶음 판매): 제품에서 가장 무거운 옵션(같은 용량이면 맛별 전부)도 `BUNDLE_TARGET_KG`(10kg) 미만이면, 10kg 이상이 되는 가장 작은 N (2~`BUNDLE_MAX_QTY` 10). 30kg 초과 · 면세 초과면 제안하지 않는다.
   - `Pricing.bundle_prices`: 묶음 2 이상 판매가 `[{option_id, bundle_qty, sale_price, listing_group, is_base}]`. `option_prices` 의 각 줄에도 `bundle_qty: 1` 이 붙는다.
   - **채택** (`product_bundle`, migration 26): 묶음을 판매 옵션으로 넣는 결정은 판매가와 따로 남긴다 (판매가는 사람이 정함). 응답 `bundles[].adopted`.
-    `POST /products/{id}/pricing/bundles` `{option_id, bundle_qty(2~10)}` — 최신 조사 옵션만, 30kg 초과면 400. 다시 넣으면 같은 줄을 살림.
+    `POST /products/{id}/pricing/bundles` `{option_id, bundle_qty(2~10)}` — 이 제품의 살아 있는 옵션만, 30kg 초과면 400. 다시 넣으면 같은 줄을 살림.
     `DELETE /products/{id}/pricing/bundles/{option_id}/{bundle_qty}` — 채택만 풂 (저장된 판매가는 가격 책정 저장으로 지움). 제품 목록 `bundle_unpriced` = 채택한 묶음 중 판매가 빈 칸 수 (판매처 × 묶음).
     2026-10-26 가격 책정 끝난 제품의 10kg 제안을 일괄 채택 (`source=rule`, 105개 제품 · 215묶음, 판매가 없음).
   - 마켓 판매자 코드(쿠팡 `externalVendorSku`) = `{제품 코드}-{옵션 id}` · 묶음이면 `{제품 코드}-{옵션 id}x{N}`. 쿠팡에서 불러오기와 주문 → 타오바오 구매 연결이 이 코드를 읽는다.
@@ -507,10 +510,11 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 }
 ```
 - 소수 값은 `price_cny` 처럼 **문자열**. `updated_at` 은 `saved: false` 면 `null`.
-- `base_option_id` = 저장한 대표 옵션 (없으면 자동). 기준 조사가 바뀌었으면 판매가처럼 `null`.
+- `base_option_id` = 저장한 대표 옵션 (없으면 자동). 그 옵션이 지워졌으면 `null`.
+- 저장 뒤 새 조사가 생겨도(`survey_id` ≠ 응답 `survey.id`) 판매가·`listing_group`·`is_base`·`base_option_id` 는 그대로 낸다 (옵션 id 고정, 2026-11-18 — 예전엔 전부 `null`). FE 는 이때 "새 조사" 로 다시 저장하라고 알린다 (원가가 바뀌었을 수 있음).
   네이버 옵션가 한도 (할인 전 대표가 기준, 2026-10-20 확인): 1만 원 이상 −50%~+50% · 2천~1만 원 −50%~+100% · 2천 원 미만 0~+100%. FE `NAVER_ADDON_LIMITS`.
 - `option_prices` 는 응답의 `options` 순서·개수와 같다 (판매가 없으면 `sale_price: null`).
-- `option_prices[].listing_group` · `is_base` = 저장한 직접 지정값 (없으면 `null` · `false`). 네이버 상품 나눠 등록 — 기준 조사가 바뀌었으면 빈 값.
+- `option_prices[].listing_group` · `is_base` = 저장한 직접 지정값 (없으면 `null` · `false`). 네이버 상품 나눠 등록.
 - 저장된 설정의 `survey_id` 가 기준 조사와 다르면(새 조사가 생김) 판매가는 옛 옵션 기준이라 전부 `null` 로 주고, `survey_id` 는 저장된 값 그대로 준다 → FE 는 "새 조사 기준으로 다시 저장" 안내.
 - **차익 · 마진율은 BE 가 주지 않는다** — FE 가 계산한다 (BE `DESIGN.md` §6.3 공식).
 
@@ -733,11 +737,12 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   "id": 1, "product_id": 38, "platform": "coupang", "market_product_id": "16425945667",
   "title": "북빙양 귤맛 탄산음료 330ml x 6캔", "url": "https://www.coupang.com/vp/products/9790651423?vendorItemId=96228038011",
   "status": "승인완료", "listed_at": "2026-10-24T18:05:42+09:00",
-  "items": [{"option_id": 63, "name": "330ml×6캔", "sale_price": 18400, "market_item_id": "96228038011", "sku": "PR-261020-0007-63"}],
+  "items": [{"option_id": 63, "bundle_qty": 1, "name": "330ml×6캔", "sale_price": 18400, "market_sale_price": 18400, "market_item_id": "96228038011", "sku": "PR-261020-0007-63"}],
   "source": "api", "synced_at": "…", "memo": null, "created_at": "…", "updated_at": "…"
 }
 ```
 - `market_product_id` = 쿠팡 sellerProductId · 네이버 원상품번호. (`platform`, `market_product_id`) unique.
+- `items[].sale_price` = **가격 책정 판매가** (`option_price`, 같은 판매처·옵션·묶음 — 없으면 저장된 값). `items[].market_sale_price` = 마켓에서 불러온 시점 값 (복사본, 참고용 — 마켓 실제 가격과 가격 책정이 다르면 여기서 보인다). (2026-11-18)
 - `listed_at` = 업로드 일시 (쿠팡은 셀러 상품 `createdAt`, KST). `status` = 마켓이 준 상태 그대로 (직접 입력이면 null).
 - `source`: `api` (마켓에서 불러옴) · `manual` (직접 입력).
 
