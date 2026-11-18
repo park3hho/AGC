@@ -910,4 +910,4 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 
 | 메서드 | 경로 | 설명 |
 | --- | --- | --- |
-| GET | `/shop-analytics?from=&to=` | KST 날짜 (없으면 최근 7일). 응답 `range, live(30분), total{visitors, sessions, views, views_per_session, bounce_pct, median_sec, orders, revenue, conversion_pct}, funnel[{key,label,sessions}], days[{date,visitors,views,orders,revenue}], sources[{name,sessions,visitors,carts,orders}], pages[{name,views}], products[{code,name,views,carts}], devices[{name,visitors}], browsers[...], tracking_since` |
+| GET | `/shop-analytics?from=&to=&all=` | KST 날짜 (없으면 최근 7일). **기본은 국내 손님만** — 해외 접속(country≠KR, 봇)과 우리 계정(이메일 @eidofood.com · 대표 id 3)으로 한 번이라도 로그인한 브라우저를 뺀다, `all=true` 면 전부 (2026-11-18). 응답 `range, filter{all, excluded_foreign, excluded_internal}, live(30분), total{visitors, sessions, views, views_per_session, bounce_pct, median_sec, orders, revenue, conversion_pct}, funnel[{key,label,sessions}], days[{date,visitors,views,orders,revenue}], sources[{name,sessions,visitors,carts,orders}], pages[{name,views}], products[{code,name,views,carts}], devices[{name,visitors}], browsers[...], tracking_since` |
