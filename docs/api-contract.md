@@ -1006,3 +1006,10 @@ PUT `/competitor-prices/watch` 요청 (제품 × 판매처 × 옵션, 옵션을 
 - 규칙: 소포가 기록돼 있으면 **전부 입고 + 입고 수 ≥ package_count** 일 때만 구매가 arrived(서버가 맞춤). 일부만이면 shipped → 묶음 ready 안 됨. `PATCH /taobao-purchases/{id} {cn_status:"arrived"}` 는 덜 들어왔으면 409.
 - 구매 새 칸(PATCH 가능): `cn_last_text`(마지막 물류 문구), `package_count`, `refund_status`(none·requested·success·rejected, requested/success 로 바꾸면 시각 자동), `refund_no`, `refund_cny`, `refund_requested_at`, `refund_done_at`. 응답에 `packages` 배열.
 - 주문 새 칸: `delay_requested_at`, `deadline_stage`. 묶음 새 칸: `notified_at`, `notice_note`.
+
+### 집운 동기화 (결제 후) — POST /ops/jiyun-sync (2026-11-19, migration 52 jiyun_trade)
+- 권한 `/ops/*` 와 같음(API 키 허용). 루틴이 결제용 타오바오 탭에서 받은 JSON 을 그대로 넘긴다: `{orders: consolidationOrderList.json 의 data.secondConsoOrders, details: {tradeId: orderDetail.json 의 data}, traces: {tradeId: trace_detail.htm 글자}}`.
+- 응답: `{seen, need_detail[tradeId], need_trace[tradeId], dispatched[{trade_id, lp_no, hbl, orders}], new_paid[{trade_id, lp_no, orders, receiver_check}], mismatch[...], unchanged, errors}` — 받는 사람 원본 없음.
+- 서버 판단: 최근 30일 집운 주문 → LP(상세 lpNo · 묶음 jiyun_trade_id)로 우리 집운 기록과 맞춤. 已出库 + 우리 기록 requested → `jiyun_bundle_service.update_bundle(status dispatched, dispatched_at=트레이스 '包裹已出库' 시각(중국시), hbl=mailNos[0])` + 알림 `dispatched:{LP}`. 우리 기록 없음(닫힘·취소·환불 제외) → firstStageOrders 로 구매·주문 찾고 받는 곳(이름 + 주소 앞 두 토막) 비교 → `jiyun_trade.receiver_check` match·mismatch·unknown, 알림 `jiyun_paid:{LP}`(action) · `jiyun_paid:{LP}:mismatch`(blocked).
+- 할 일 `jiyun_record`(action, 55): jiyun_trade 중 최근 14일 · 우리 집운 기록 없음. check-mode 급한 할 일에 포함.
+- 집운 결제 전(판매처 발송 · 창고 입고 · 待集运)은 PC JSON 이 없어(mtop 서명 · 앱 전용) 물류 화면으로 본다.
