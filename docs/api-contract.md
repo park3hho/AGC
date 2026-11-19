@@ -924,9 +924,9 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | PUT `/competitor-prices/watch` | research | 점검 설정 넣기 (보낸 칸만) |
 | POST `/competitor-prices/bulk` | research | 확인 결과 저장 — 이때 기준값(basis)을 같이 남겨 그 줄의 사유가 풀린다. 항목에 `vendor_ref` (판매자 상품 식별 캐시, 예: 쿠팡 `{productId, vendorItemId}`) 를 넣을 수 있다 |
 
-순서 (`group` · `rank`): `order`(1, 24시간보다 오래 확인 안 했는데 그 뒤 그 마켓 주문 — 최근 3일) → `changed`(2, 확인 때 기준값과 지금 값이 다름: 판매가 · 원가(조사가 · 실구매가 · 운임) · 옵션명 · 상품명, 또는 그 뒤 새 옵션 · 새 마켓 등록 · 손으로 단 확인 필요 표시) → `new`(3, 확인 전) → `retry`(4, 지난번 not_found) → `watch`(5, lose · match) → `stale`(6, 오래된 순). 같은 순위 안에서는 주문 최근 순 / 확인 오래된 순.
+순서 (`group` · `rank`): `order`(1, 24시간보다 오래 확인 안 했는데 그 뒤 그 마켓 주문 — 최근 3일) → `changed`(2, 화면 · 라벨 '수정', 확인 때 기준값과 지금 값이 다름: 판매가 · 원가(조사가 · 실구매가 · 운임) · 옵션명 · 상품명, 또는 그 뒤 새 옵션 · 새 마켓 등록 · 손으로 단 확인 필요 표시) → `new`(3, 확인 전) → `retry`(4, 지난번 not_found) → `watch`(5, lose · match) → `stale`(6, 오래된 순). 같은 순위 안에서는 주문 최근 순 / 확인 오래된 순.
 기준값이 없는 옛 확인(11-19 이전 저장)은 판매가 · 옵션 수정 시각으로 대신 판정한다 (`detail` 에 '기준값 없는 옛 확인').
-`skip_until`(보류)은 retry · watch · stale 에만 적용 — 주문 · 바뀜 · 신규는 보류 중이어도 올라온다.
+`skip_until`(보류)은 retry · watch · stale 에만 적용 — 주문 · 수정 · 신규는 보류 중이어도 올라온다.
 
 queue 응답:
 ```json
@@ -935,7 +935,7 @@ queue 응답:
  "order": ["order", "changed", "new", "retry", "watch", "stale"],
  "items": [{"rank": 1, "group": "order", "group_label": "주문 들어옴",
    "reasons": [{"code": "order", "label": "주문 들어옴", "detail": "2건 · 최근 OR-261119-0004 2026-11-19 14:11", "at": "2026-11-19 14:11"},
-               {"code": "price", "label": "판매가 바뀜", "detail": "29,400원 → 27,900원"}],
+               {"code": "price", "label": "판매가 수정", "detail": "29,400원 → 27,900원"}],
    "product_id": 24, "code": "PR-…", "title": "…", "platform": "coupang", "option_id": 15, "option": "재스민차 500ml×15병",
    "competitor_id": 31, "query": "동방수엽 재스민 500ml", "query_source": "override|last|title",
    "search_note": null, "user_note": null, "needs_user_check": false, "skip_until": null, "skipped": false,
