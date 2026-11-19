@@ -960,3 +960,49 @@ PUT `/competitor-prices/watch` 요청 (제품 × 판매처 × 옵션, 옵션을 
 ```
 - `skip_days` = 오늘(KST)부터 N일 보류, 0 = 해제 (`skip_until` 날짜로 직접 줘도 됨) · `flag_reason` = '확인 필요' 표시, 빈 문자열 = 해제. 표시는 그 뒤 확인 저장되면 저절로 풀린다
 - queue 의 `query` 는 `query_override` → 지난번 검색어 → 제품명 순
+
+## 30분 점검 규칙화 — 할 일 · AI 알림 · 소포 · 점검 상태 (2026-11-19, BE migration 50)
+
+원칙: 루틴(AI)이 메모에 들고 다니던 상태('다음 차례', 'max 번호', '보고함·재보고 금지', 메모 태그 [집운결제 안내]·[退款 신청]·[추가 소포])를 DB 로 옮긴다. AI 는 할 일을 읽고 → 일하고 → 결과를 저장만 한다. 화면(오늘 할 일 · AI 알림)도 같은 API.
+
+권한: `/ops/*` 는 order 권한 사용자 + **API 키 허용**(개인정보 없음). 소포 API 는 order(API 키 불가, 다른 주문 API 와 같음).
+
+### GET /ops/tasks?include_test=false
+`{generated_at, total, action(알릴 것 남은 action 수), counts:{type:n}, types:{type:{label,group,priority}}, items:[{type, label, group(action|wait), priority, order_ids, order_codes, target:{kind(order|purchase|bundle|jiyun|decl|bl|stock), id, code}, reason, detail, since?, due_on?, stage?, alerted?, seller_code?, stock_ids?}]}` — priority 순.
+
+| type | 조건 (서버 계산) |
+|---|---|
+| claim | 진행 중 주문에 claim_type |
+| confirm | 접수 · 발주확인 전 |
+| naver_delay | 네이버 · 발주확인 · delay_requested_at 없음 · 마켓 송장 없음 (원본에 delayedDispatchReason 있으면 서버가 채우고 뺌) |
+| import_decl | 수입신고 대기 B/L (`/import-declarations/pending` 과 같음) |
+| import_status | 신고 sent · accepted · fix — 접수·수리·오류통보 확인 |
+| cancel_followup | 최근 7일 취소 + 살아 있는 구매 + refund_status none + 재고 아님 + memo 에 [退款 없음 |
+| purchase | 발주확인 + 구매·집운 기록 없음 (stock_ids = 쓸 수 있는 집운 재고) |
+| jiyun_pay_notice | 묶음 open·confirmed · 소포 전부 입고(package_count 포함) · notified_at 없음 · 집운 기록 없음 |
+| jiyun_pay_wait | 위와 같은데 안내함(notified_at) — 사용자 결제 대기 |
+| invoice | 집운 출고 + 마켓에 국내 송장 없음 |
+| deadline | 마켓 송장 없음 + 발송기한 D-3·D-1·지남 (`services/ops/deadline`), alerted = deadline_stage 가 이미 그 단계 이상. 테스트 주문 포함 |
+| dispatch_check | 집운 결제됨(requested) · 출고 전 |
+| stock_aging | 집운 재고 available 14일 넘음 |
+| refund_wait | refund_status requested |
+| cn_track | 구매 ordered·shipped (소포 있으면 'n/m 입고 · 남은 운송장'), 묶음 일부 입고 |
+
+### AI 알림 — /ops/alerts
+- `POST /ops/alerts {key, kind, title, body?, level?(info|action|blocked), order_codes?, target?, source?}` → `{new, alert}`. 열린 같은 key 면 new:false(count+1, last_at). 해결된 key 면 다시 열고 new:true. **루틴은 new=true 일 때만 사용자에게 보고.**
+- key 규칙 `{kind}:{대상}[:{단계/숫자}]` — 예 `deadline_d3:OR-261116-000A`, `bundle_partial:PRE_LP000000001D:1/2`, `card_confirmed:purchase:65`.
+- kind: order_new · purchase_blocked · alipay_low · login_needed · jiyun_pay_needed · bundle_partial · package_partial · jiyun_paid · dispatched · invoice_sent · import_sent · import_error · claim · refund · deadline_d3 · deadline_d1 · deadline_over · stock_aging · card_confirmed · other.
+- `GET /ops/alerts?kind=&open=true&since=&q=&limit=` → `{items, total, kinds, levels}`. `PATCH /ops/alerts/{id} {resolved}`.
+- 서버 코드: `services/ops/alerts.raise_alert(...)` (POST 와 같음), `resolve_key(key)`.
+
+### 점검 상태 표시
+- `POST /ops/orders/{id}/mark {delay_requested_at?, deadline_stage?(d3|d1|over|"")}` — 보낸 칸만.
+- `POST /ops/bundles/{code}/notified {note?, notified_at?, clear?}` — 집운 결제 안내 보냄 표시 (jiyun_pay_notice → jiyun_pay_wait).
+
+### 구매 소포 · 환불 칸
+- `GET /taobao-purchases/{id}/packages` → `{items, gate:{packages, arrived, need, complete}}`
+- `POST /taobao-purchases/{id}/packages {tracking_no, courier?, status(shipped|arrived|problem), shipped_at?, arrived_at?, last_text?, memo?}` — 첫 추가면 구매의 기존 운송장도 소포 1 로 같이 남김.
+- `PATCH /taobao-purchases/packages/{pid}` · `DELETE /taobao-purchases/packages/{pid}`.
+- 규칙: 소포가 기록돼 있으면 **전부 입고 + 입고 수 ≥ package_count** 일 때만 구매가 arrived(서버가 맞춤). 일부만이면 shipped → 묶음 ready 안 됨. `PATCH /taobao-purchases/{id} {cn_status:"arrived"}` 는 덜 들어왔으면 409.
+- 구매 새 칸(PATCH 가능): `cn_last_text`(마지막 물류 문구), `package_count`, `refund_status`(none·requested·success·rejected, requested/success 로 바꾸면 시각 자동), `refund_no`, `refund_cny`, `refund_requested_at`, `refund_done_at`. 응답에 `packages` 배열.
+- 주문 새 칸: `delay_requested_at`, `deadline_stage`. 묶음 새 칸: `notified_at`, `notice_note`.
