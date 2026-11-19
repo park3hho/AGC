@@ -912,3 +912,44 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
 | --- | --- | --- |
 | GET | `/shop-analytics/digest?hours=6` | 최근 N시간(1~168) 유입 요약 (2026-11-18). 응답 `window{hours,from,to}, notable(둘러본 손님 · 바깥 유입 · 결제 있음), real{visitors, sessions, engaged, outside, product_views, carts, checkouts, orders, revenue, sources[]}, sessions[{at, source, pages, seconds, products[], cart, checkout, purchase, device, browser}], orders[], excluded{foreign, burst_bot, internal}, server{since_day, valid, crawler, invalid, top_invalid[]}`. 같은 내용을 `python -m scripts.shop_digest --hours 6 [--json]` 으로도 (6시간 점검 루틴) |
 | GET | `/shop-analytics?from=&to=&all=` | KST 날짜 (없으면 최근 7일). **기본은 국내 손님만** — 해외 접속(country≠KR, 봇)과 우리 계정(이메일 @eidofood.com · 대표 id 3)으로 한 번이라도 로그인한 브라우저를 뺀다, `all=true` 면 전부 (2026-11-18). 응답 `range, filter{all, excluded_foreign, excluded_internal}, traffic{since, total, kinds{valid,crawler,invalid}, invalid_pct, days[{date,valid,crawler,invalid}], reasons[{key,name,hits}], agents[], crawlers[], paths[{path,hits}], countries[{code,hits}]} (서버가 받은 요청 — SHOP-BE traffic_hit, 필터와 무관, 2026-11-18), live(30분), total{visitors, sessions, views, views_per_session, bounce_pct, median_sec, orders, revenue, conversion_pct}, funnel[{key,label,sessions}], days[{date,visitors,views,orders,revenue}], sources[{name,sessions,visitors,carts,orders}], pages[{name,views}], products[{code,name,views,carts}], devices[{name,visitors}], browsers[...], tracking_since` |
+
+
+### 최저가 경쟁 확인 대기열 (`/competitor-prices/queue` · `/watch`) — 2026-11-19
+매일 점검 루틴이 '무엇을 먼저 볼지'를 DB 에서 읽는다. 루틴은 **queue 읽기 → 마켓 검색 → POST /competitor-prices/bulk 저장**만 한다 (세션 메모에 다음 차례 · 검색어 · 메모를 들고 다니지 않는다).
+
+| 메서드 · 경로 | 권한 | 설명 |
+|---|---|---|
+| GET `/competitor-prices/queue?platform=coupang&limit=40&include_skipped=false` | 로그인 (API 키 가능) | 확인할 줄을 우선순위대로 |
+| GET `/competitor-prices/watch?platform=` | 로그인 | 점검 설정 목록 |
+| PUT `/competitor-prices/watch` | research | 점검 설정 넣기 (보낸 칸만) |
+| POST `/competitor-prices/bulk` | research | 확인 결과 저장 — 이때 기준값(basis)을 같이 남겨 그 줄의 사유가 풀린다. 항목에 `vendor_ref` (판매자 상품 식별 캐시, 예: 쿠팡 `{productId, vendorItemId}`) 를 넣을 수 있다 |
+
+순서 (`group` · `rank`): `order`(1, 24시간보다 오래 확인 안 했는데 그 뒤 그 마켓 주문 — 최근 3일) → `changed`(2, 확인 때 기준값과 지금 값이 다름: 판매가 · 원가(조사가 · 실구매가 · 운임) · 옵션명 · 상품명, 또는 그 뒤 새 옵션 · 새 마켓 등록 · 손으로 단 확인 필요 표시) → `new`(3, 확인 전) → `retry`(4, 지난번 not_found) → `watch`(5, lose · match) → `stale`(6, 오래된 순). 같은 순위 안에서는 주문 최근 순 / 확인 오래된 순.
+기준값이 없는 옛 확인(11-19 이전 저장)은 판매가 · 옵션 수정 시각으로 대신 판정한다 (`detail` 에 '기준값 없는 옛 확인').
+`skip_until`(보류)은 retry · watch · stale 에만 적용 — 주문 · 바뀜 · 신규는 보류 중이어도 올라온다.
+
+queue 응답:
+```json
+{"status": "success", "platform": "coupang", "generated_at": "2026-11-19 14:40", "total": 403, "skipped": 0,
+ "counts": {"order": 3, "changed": 8, "new": 2, "watch": 25, "stale": 365},
+ "order": ["order", "changed", "new", "retry", "watch", "stale"],
+ "items": [{"rank": 1, "group": "order", "group_label": "주문 들어옴",
+   "reasons": [{"code": "order", "label": "주문 들어옴", "detail": "2건 · 최근 OR-261119-0004 2026-11-19 14:11", "at": "2026-11-19 14:11"},
+               {"code": "price", "label": "판매가 바뀜", "detail": "29,400원 → 27,900원"}],
+   "product_id": 24, "code": "PR-…", "title": "…", "platform": "coupang", "option_id": 15, "option": "재스민차 500ml×15병",
+   "competitor_id": 31, "query": "동방수엽 재스민 500ml", "query_source": "override|last|title",
+   "search_note": null, "user_note": null, "needs_user_check": false, "skip_until": null, "skipped": false,
+   "last_status": "found", "last_verdict": "match", "last_checked_at": "2026-11-18T05:12:00+00:00",
+   "our_price": 27900, "min_price": 25100, "vendor_name": "…", "vendor_price": 26900, "vendor_ref": null}]}
+```
+reasons[].code: `order` · `price` · `cost` · `option` · `title` · `new_option` · `listing` · `flag` · `new` · `retry` · `watch` · `stale`
+
+PUT `/competitor-prices/watch` 요청 (제품 × 판매처 × 옵션, 옵션을 비우면 제품 전체):
+```json
+{"product_id": 385, "platform": "coupang", "option_id": null,
+ "query_override": "루이싱 동결건조 커피", "search_note": "원기탄 플랫화이트로는 안 나옴",
+ "user_note": "같은 제품인지 확인 필요", "needs_user_check": true,
+ "skip_days": 1, "flag_reason": "판매가 인상 — 다시 확인"}
+```
+- `skip_days` = 오늘(KST)부터 N일 보류, 0 = 해제 (`skip_until` 날짜로 직접 줘도 됨) · `flag_reason` = '확인 필요' 표시, 빈 문자열 = 해제. 표시는 그 뒤 확인 저장되면 저절로 풀린다
+- queue 의 `query` 는 `query_override` → 지난번 검색어 → 제품명 순
