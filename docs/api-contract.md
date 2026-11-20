@@ -1013,3 +1013,11 @@ PUT `/competitor-prices/watch` 요청 (제품 × 판매처 × 옵션, 옵션을 
 - 서버 판단: 최근 30일 집운 주문 → LP(상세 lpNo · 묶음 jiyun_trade_id)로 우리 집운 기록과 맞춤. 已出库 + 우리 기록 requested → `jiyun_bundle_service.update_bundle(status dispatched, dispatched_at=트레이스 '包裹已出库' 시각(중국시), hbl=mailNos[0])` + 알림 `dispatched:{LP}`. 우리 기록 없음(닫힘·취소·환불 제외) → firstStageOrders 로 구매·주문 찾고 받는 곳(이름 + 주소 앞 두 토막) 비교 → `jiyun_trade.receiver_check` match·mismatch·unknown, 알림 `jiyun_paid:{LP}`(action) · `jiyun_paid:{LP}:mismatch`(blocked).
 - 할 일 `jiyun_record`(action, 55): jiyun_trade 중 최근 14일 · 우리 집운 기록 없음. check-mode 급한 할 일에 포함.
 - 집운 결제 전(판매처 발송 · 창고 입고 · 待集运)은 PC JSON 이 없어(mtop 서명 · 앱 전용) 물류 화면으로 본다.
+
+## 알리페이 잔액 장부 — /alipay-balance (2026-11-20, migration 53)
+- 목적: 즈푸바오(알리페이) 잔액에 위안을 충전한 환율을 적어 두고, 잔액 결제는 **선입선출**(오래된 충전부터)로 깎아 그 환율로 원화를 계산. 두 충전에 걸치면 깎은 위안 비율대로 (¥40×202 + ¥23×201).
+- 권한 order + API 키 허용. `GET /alipay-balance` → `{start, balance_cny, balance_krw, avg_rate, lots[{id, topped_at, cny, krw, rate, is_opening, memo, left_cny}], items[{id, spent_at, cny, kind(purchase|jiyun|other), ref_id, label, krw, rate, allocations[{topup_id, cny, rate, krw}], short_cny}]}`.
+- `POST /alipay-balance/topups {topped_at, cny, krw, is_opening?, memo?}` · `PATCH/DELETE /alipay-balance/topups/{id}` · `POST /alipay-balance/spends {spent_at, cny, memo}`(구매·집운 아닌 잔액 지출) · `DELETE /alipay-balance/spends/{id}`(직접 기록만) · `POST /alipay-balance/recompute`.
+- 자동: 구매·집운 중 `pay_method=alipay` + `charged_source` 에 '잔액' + 결제 시각 ≥ 장부 시작(기초 잔액) → 결제 기록. 다시 계산하면 그 기록의 `charged_krw`·`charged_source`("알리페이 잔액 선입선출 ¥…×…")·`charged_status=settled` 를 고치고 FIN 지출을 다시 보냄. 구매·집운 저장 때마다 뒤에서 다시 계산(`alipay_ledger.kick`).
+- 결제 시각보다 늦게 들어온 충전은 그 결제에 못 씀. 모자라면 `short_cny` + 마지막 충전 환율(없으면 202)로 임시 계산.
+- 장부 시작: 2026-11-20 22:34 KST 기초 잔액 ¥639.72 (1위안 202원 가정). 그 전 결제는 예전 202원 규칙 그대로.
