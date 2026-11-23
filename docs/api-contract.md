@@ -224,10 +224,14 @@ FE와 BE가 공유하는 API 스펙. 변경 시 이 문서를 먼저 수정한�
   | `option2` | 200자 이하, `null` 이면 지움 |
   | `photo_url` | POST 의 `photo_url` 과 같음 |
   | `barcode` | POST 의 `options[].barcode` 와 같음. `null`·빈 값이면 지움 (2026-10-27) |
+  | `unit_amount` · `unit` · `unit_count` · `count_word` · `pack_count` · `total_count` · `spec_note` | 규격 구조 칸 (2026-11-22). unit = g·kg·ml·L, 개수는 1 이상. 하나라도 보내면 `spec_source='manual'`, `spec_checked=true` 로 저장 (total_count 를 안 보내면 unit_count × pack_count) |
+  | `spec_checked` | 사람이 확인함 표시만 바꿈 |
+  | `spec_source` | `"auto"` 를 보내면 option2 로 다시 자동 해석 (`utils/option_spec.py`) |
   | (`price_cny` 등 다른 필드) | 무시 — 가격 변경은 판매가 재계산이 필요해서 여기서 받지 않음 |
 - Response 200: `{"status": "success", "price_survey": PriceSurvey}`
 - Response 400 (바꿀 필드 없음) · 404 (조사 또는 그 조사의 옵션이 아님) · 409 (같은 (옵션1, 옵션2) 조합이 이미 있음)
-- option2 의 용량 표기를 바꾸면 배송비 용량 계산(`utils/volume.py`, g = ml 로 읽음)도 그 문자열로 다시 계산된다.
+- option2 의 용량 표기를 바꾸면 규격 구조 칸이 다시 자동 해석되고(spec_source 가 manual 이면 그대로) 배송비 용량(unit_amount × total_count, 비었으면 `utils/volume.py` 글자 해석, g = ml)도 따라 바뀜다.
+- 조사 상세의 `options[]` 에는 위 구조 칸과 `spec_checked` · `spec_source` 가 함께 온다 (unit_amount 는 문자열 `"2.8"`).
 
 ### DELETE /price-surveys/{survey_id}/options/{option_id} — 옵션 1개 삭제 (2026-10-30)
 중복 옵션 정리용. **소프트 삭제** (2026-11-18) — 옵션 `id` 는 남아 옛 주문 SKU 를 계속 찾고, 같은 이름으로 다시 넣으면 그 `id` 가 살아난다. 다른 옵션의 `id`·판매가는 그대로. 지운 옵션의 판매가(OptionPrice)는 함께 지워지고 대표 옵션 지정(base_option)은 비워지며 묶음 채택도 풀린다.
